@@ -1,0 +1,8 @@
+# Binary files
+bin
+
+# CMake build files
+build
+
+# VS Code project files
+.vscode

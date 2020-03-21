@@ -18,9 +18,6 @@ int main(int argc, char* argv[])
 	std::string location {argv[1]};
 	int portNumber {std::stoi(argv[2])};
 
-	std::cout << "ip>" << location << "<\n";
-	std::cout << "port>" << portNumber << "<\n";
-
 	// Create socket
 	int sockfd {socket(AF_INET, SOCK_STREAM, 0)};
 	if(sockfd == -1)

@@ -75,7 +75,6 @@ int main(int argc, char* argv[])
 
 	freeaddrinfo(listBegin);
 
-	std::cout << "Server ";
 	displayInfo("Server", (sockaddr_in*)result->ai_addr);
 
 	// Listen for connection
@@ -168,6 +167,7 @@ int main(int argc, char* argv[])
 		}
 	}
 
+	std::cout << "Closing and exiting program.\n";
 	close(sockfdListener);
 
 	return 0;

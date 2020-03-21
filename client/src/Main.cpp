@@ -55,7 +55,7 @@ int main(int argc, char* argv[])
 				serverServiceName, NI_MAXSERV, 0);
 
 	inet_ntop(AF_INET, &hint.sin_addr, serverName, NI_MAXHOST);
-	std::cout << "Server IP: " << serverName << ", port: " << ntohs(hint.sin_port) << "\n\n";
+	std::cout << "Connected.\nServer IP: " << serverName << ", port: " << ntohs(hint.sin_port) << "\n\n";
 
 	unsigned int bufferSize {4096};
 	char receiveBuffer [bufferSize];
@@ -63,10 +63,16 @@ int main(int argc, char* argv[])
 
 	std::cout << "(type \"/close\" to disconnect)\n\n";
 
-	do
+	while(true)
 	{
 		std::cout << "YOU> ";
 		getline(std::cin, input);
+
+		if(input == "/close")
+		{
+			std::cout << "Disconnecting..." << std::endl;
+			break;
+		}
 
 		long int sentBytes {send(sockfd, input.c_str(), static_cast<int>(input.length()), 0)};
 		if(sentBytes == -1)
@@ -79,7 +85,6 @@ int main(int argc, char* argv[])
 			memset(receiveBuffer, 0, bufferSize);
 
 			long int receivedBytes {recv(sockfd, receiveBuffer, static_cast<int>(bufferSize), 0)};
-			std::cout << "bytes received: " << receivedBytes << "\n";
 			if(receivedBytes == -1)
 			{
 				std::cerr << "Error receiving data." << std::endl;
@@ -91,7 +96,7 @@ int main(int argc, char* argv[])
 			}
 		}
 
-	} while(input != "/close");
+	}
 
 	close(sockfd);
 

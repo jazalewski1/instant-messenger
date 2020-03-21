@@ -124,6 +124,19 @@ int main(int argc, char* argv[])
 		{
 			std::string message {buffer, 0, static_cast<long unsigned int>(bytesReceived)};
 			std::cout << "CLIENT> " << message << std::endl;
+
+			std::string confirmMsg {"Message received"};
+
+			long int sentBytes {send(sockfdHost, confirmMsg.c_str(), static_cast<int>(confirmMsg.length()), 0)};
+			if(sentBytes == -1)
+			{
+				std::cerr << "Error sending data! Disconnecting..." << std::endl;
+				break;
+			}
+			else
+			{
+				std::cout << "Message sent back.\n";
+			}
 		}
 	}
 

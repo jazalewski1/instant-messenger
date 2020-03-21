@@ -67,8 +67,68 @@ int main(int argc, char* argv[])
 	inet_ntop(AF_INET, (in_addr*)&saddrin->sin_addr, serverName, NI_MAXHOST);
 	std::cout << "Server IP: " << serverName << ", port: " << portNumber << "\n\n";
 
-	// Close socket
+	// Listen for connection
+	int listenResult {listen(sockfd, SOMAXCONN)};
+	if(listenResult == -1)
+	{
+		std::cerr << "Error listening!" << std::endl;
+		return -4;
+	}
+
+	sockaddr_in hostHint;
+	socklen_t hostSize {sizeof(hostHint)};
+
+	int sockfdHost {accept(sockfd, (sockaddr*)&hostHint, &hostSize)};
+	if(sockfdHost == -1)
+	{
+		std::cerr << "Error accepting client!" << std::endl;
+		return -5;
+	}
+
+	// Close listening socket
 	close(sockfd);
+
+	// Print client info
+	char hostName [NI_MAXHOST];
+	memset(hostName, 0, NI_MAXHOST);
+	char hostServiceName [NI_MAXSERV];
+	memset(hostServiceName, 0, NI_MAXSERV);
+
+	getnameinfo((sockaddr*)&hostHint, hostSize, 
+				hostName, NI_MAXHOST, 
+				hostServiceName, NI_MAXSERV, 0);
+
+	inet_ntop(AF_INET, &hostHint.sin_addr, hostName, NI_MAXHOST);
+	std::cout << "Client IP: " << hostName << ", port: " << ntohs(hostHint.sin_port) << std::endl;
+
+	// Start receiving/sending data
+	unsigned int bufferSize {4096};
+	char buffer [bufferSize];
+	
+	while(true)
+	{
+		memset(buffer, 0, bufferSize);
+
+		long int bytesReceived {recv(sockfdHost, buffer, bufferSize, 0)};
+		if(bytesReceived == -1)
+		{
+			std::cerr << "Error receiving data!" << std::endl;
+			break;
+		}
+		else if(bytesReceived == 0)
+		{
+			std::cout << "Client disconnected. Closing." << std::endl;
+			break;
+		}
+		else
+		{
+			std::string message {buffer, 0, static_cast<long unsigned int>(bytesReceived)};
+			std::cout << "CLIENT> " << message << std::endl;
+		}
+	}
+
+
+	close(sockfdHost);
 
 	return 0;
 }

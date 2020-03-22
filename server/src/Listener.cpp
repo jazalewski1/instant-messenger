@@ -12,7 +12,7 @@
 Listener::Listener(int portNumber) :
 	m_port{std::to_string(portNumber)}, m_sockfdCount{0}
 {
-	std::cout << "Listener constructor.\n";
+	// std::cout << "Listener constructor.\n";
 }
 
 Listener::~Listener()
@@ -32,7 +32,7 @@ Listener::~Listener()
 
 	removeSocket(m_listenSockfd);
 
-	std::cout << "Listener destructor.\n";
+	// std::cout << "Listener destructor.\n";
 }
 
 int Listener::createListeningSocket()

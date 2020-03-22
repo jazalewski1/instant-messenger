@@ -11,13 +11,13 @@
 Client::Client(const std::string& ipAddress, int portNumber) :
 	m_serverIpAddress{ipAddress}, m_serverPortNumber{portNumber}
 {
-	std::cout << "Client constructor.\n";
+	// std::cout << "Client constructor.\n";
 }
 
 Client::~Client()
 {
 	close(m_sockfd);
-	std::cout << "Client destructor.\n";
+	// std::cout << "Client destructor.\n";
 }
 
 int Client::createSocket()
@@ -78,8 +78,6 @@ void Client::run()
 		}
 
 		long int sentBytes {sendAll(input)};
-		std::cout << "sent bytes: " << sentBytes << "\n";
-		std::cout << "sent msg: " << input << "\n";
 		if(sentBytes == -1)
 		{
 			std::cerr << "Error in sending data." << std::endl;
@@ -90,7 +88,6 @@ void Client::run()
 			memset(receiveBuffer, 0, bufferSize);
 
 			long int receivedBytes {recv(m_sockfd, receiveBuffer, static_cast<int>(bufferSize), 0)};
-			std::cout << "rcv bytes: " << receivedBytes << "\n";
 			if(receivedBytes == -1)
 			{
 				std::cerr << "Error receiving data." << std::endl;

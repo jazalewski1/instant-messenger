@@ -68,6 +68,12 @@ int Listener::createListeningSocket()
 		if(m_listenSockfd == -1)
 			continue;
 
+		int sockopt {1};
+		if(setsockopt(m_listenSockfd, SOL_SOCKET, SO_REUSEADDR, &sockopt, sizeof(sockopt)) == -1)
+		{
+			std::cerr << "Error: setsockopt." << std::endl;
+		}
+
 		int bindResult {bind(m_listenSockfd, listResult->ai_addr, listResult->ai_addrlen)};
 		if(bindResult == -1)
 		{
@@ -192,6 +198,7 @@ void Listener::run()
 					memset(buffer, 0, maxBufferSize);
 					
 					long int bytesReceived {recv(sockfdItr, buffer, maxBufferSize, 0)};
+					std::cout << "bytes received = " << bytesReceived << "\n";
 					if(bytesReceived <= -1)
 					{
 						std::cerr << "Error: receiving data! Socket #" << sockfdItr << std::endl;
@@ -204,6 +211,7 @@ void Listener::run()
 					}
 					else
 					{
+						std::cout << "Data received: " << buffer << "\n";
 						sendAll(sockfdItr, buffer);
 					}
 				}

@@ -198,21 +198,30 @@ void Listener::run()
 					memset(buffer, 0, maxBufferSize);
 					
 					long int bytesReceived {recv(sockfdItr, buffer, maxBufferSize, 0)};
-					std::cout << "bytes received = " << bytesReceived << "\n";
-					if(bytesReceived <= -1)
+
+					std::string dataReceived {buffer};
+
+					if(dataReceived == "/sendfile")
 					{
-						std::cerr << "Error: receiving data! Socket #" << sockfdItr << std::endl;
-					}
-					else if(bytesReceived == 0)
-					{
-						std::cout << "Client disconnected. Socket #" << sockfdItr << "\n";
-						sendMsg(sockfdItr, "Disconnecting from server.\n");
-						removeSocket(sockfdItr);
+						std::cout << "Waiting for the file.\n";
 					}
 					else
 					{
-						std::cout << "Data received: " << buffer << "\n";
-						sendAll(sockfdItr, buffer);
+						if(bytesReceived <= -1)
+						{
+							std::cerr << "Error: receiving data! Socket #" << sockfdItr << std::endl;
+						}
+						else if(bytesReceived == 0)
+						{
+							std::cout << "Client disconnected. Socket #" << sockfdItr << "\n";
+							sendMsg(sockfdItr, "Disconnecting from server.\n");
+							removeSocket(sockfdItr);
+						}
+						else
+						{
+							std::cout << "Data received: " << buffer << "\n";
+							sendAll(sockfdItr, buffer);
+						}
 					}
 				}
 			}

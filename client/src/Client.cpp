@@ -42,11 +42,6 @@ int Client::conn()
 	return connect(m_sockfd, (sockaddr*)&m_hint, sizeof(m_hint));
 }
 
-long int Client::sendAll(const std::string& msg)
-{
-	return send(m_sockfd, msg.c_str(), static_cast<int>(msg.length()), 0);
-}
-
 void Client::startReceiving()
 {
 	m_receiveThread = std::thread {[&]() { receive(); }};
@@ -81,6 +76,62 @@ void Client::receive()
 	}
 }
 
+long int Client::sendData(const std::string& msg)
+{
+	return send(m_sockfd, msg.c_str(), static_cast<int>(msg.length()), 0);
+}
+
+void Client::startSendingFile(const std::string& fileName)
+{
+	std::thread t {[&](){
+		sendFile(fileName);
+	}};
+	t.join();
+}
+
+void Client::sendFile(const std::string& fileName)
+{
+	std::cout << "Opening file.\n";
+	FILE* filePtr;
+	filePtr = fopen(fileName.c_str(), "r");
+
+	if(filePtr == nullptr)
+	{
+		std::cerr << "Error: can't open file: " << fileName << "!" << std::endl;
+	}
+	else
+	{
+		long int totalSentBytes {0};
+		while(true)
+		{
+			unsigned char buffer [1024];
+			memset(buffer, 0, 1024);
+
+			long unsigned int readBytes {fread(buffer, 1, 1024, filePtr)};
+			std::cout << "readBytes = " << readBytes << "\n";
+			if(readBytes > 0)
+			{
+				long int sentBytes {send(m_sockfd, buffer, readBytes, 0)};
+				totalSentBytes += sentBytes;
+				if(sentBytes <= -1)
+				{
+					std::cerr << "Error: can't send data!" << std::endl;
+				}
+			}
+			else if(readBytes < 1024)
+			{
+				if(feof(filePtr))
+					std::cout << "End of file.\n";
+				else if(ferror(filePtr))
+					std::cerr << "Error: can't read file!" << std::endl;
+				break;
+			}
+		}
+
+		std::cout << "Total bytes sent: " << totalSentBytes << "\n";
+	}
+}
+
 void Client::run()
 {
 	m_sockfd = createSocket();
@@ -105,6 +156,7 @@ void Client::run()
 
 	std::string input;
 	std::cout << "(type \"/close\" to disconnect)\n\n";
+	std::cout << "(type \"/sendfile\" to send a file)\n\n";
 
 	while(true)
 	{
@@ -113,17 +165,29 @@ void Client::run()
 
 		if(input == "/close")
 			break;
+		else if(input == "/sendfile")
+		{
+			std::cout << "Enter filename:\n";
+			std::string fileName;
+			getline(std::cin, fileName);
 
-		long int sentBytes {sendAll(input)};
-		if(sentBytes == -1)
-		{
-			std::cerr << "Error: can't send data." << std::endl;
-			break;
+			sendData(input);
+
+			startSendingFile(fileName);
 		}
-		else if(sentBytes == 0)
+		else
 		{
-			std::cout << "Disconnecting..." << std::endl;
-			break;
+			long int sentBytes {sendData(input)};
+			if(sentBytes == -1)
+			{
+				std::cerr << "Error: can't send data." << std::endl;
+				break;
+			}
+			else if(sentBytes == 0)
+			{
+				std::cout << "Disconnecting..." << std::endl;
+				break;
+			}
 		}
 	}
 }
@@ -135,9 +199,7 @@ void Client::displayInfo(const std::string& name, sockaddr_in* saddrPtr)
 	char port [NI_MAXSERV];
 	memset(port, 0, NI_MAXSERV);
 
-	getnameinfo((sockaddr*)&saddrPtr, sizeof(sockaddr_in), 
-				ip, NI_MAXHOST, 
-				nullptr, 0, 0);
+	getnameinfo((sockaddr*)&saddrPtr, sizeof(sockaddr_in), ip, NI_MAXHOST, nullptr, 0, 0);
 
 	inet_ntop(AF_INET, &saddrPtr->sin_addr, ip, NI_MAXHOST);
 	std::cout << name << " IP: " << ip << ", port: " << ntohs(saddrPtr->sin_port) << "\n";

@@ -23,3 +23,12 @@ $ client/bin/Client <ipAdress> <portNumber>
 ```
 
 4. To test if the chat is working, start another client the same way.
+
+5. To send file, in client application enter command:
+```
+/sendfile <fileName>
+```
+6. To close client or server application, enter command:
+```
+/close
+```

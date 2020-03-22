@@ -22,11 +22,13 @@ private:
 
 	void receive();
 
+	void receiveFile(const std::string& fileName);
+
 	long int sendData(const std::string& msg);
 
-	void startSendingFile(const std::string& fileName);
+	void startSendingFile(FILE* filePtr);
 
-	void sendFile(const std::string& fileName);
+	void sendFile(FILE* filePtr);
 
 public:
 	Client(const std::string& ipAddress, int portNumber);

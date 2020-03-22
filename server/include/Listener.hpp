@@ -28,6 +28,10 @@ private:
 
 	void removeSocket(int sockfd);
 
+	void receiveFileName(int sourceSockfd, std::string& fileName);
+
+	void receiveFile(int sourceSockfd, const std::string& fileName);
+
 	void sendAll(int sourceSockfd, const std::string& msg);
 
 	void sendMsg(int receiverSockfd, const std::string& msg);

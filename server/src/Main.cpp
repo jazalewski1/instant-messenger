@@ -16,7 +16,7 @@ int main(int argc, char* argv[])
 
 	server.startRunning();
 
-	std::cout << "(type \"/close\" to disconnect)\n\n";
+	std::cout << "\n(type \"/close\" to disconnect)\n\n";
 
 	while(true)
 	{

@@ -1,4 +1,5 @@
 #include <Listener.hpp>
+#include <algorithm>
 #include <arpa/inet.h>
 #include <iostream>
 #include <sys/socket.h>
@@ -106,12 +107,12 @@ int Listener::acceptClient()
 
 	if(newSockfd <= -1)
 	{
-		std::cerr << "Error:  can't accept client!" << std::endl;
+		std::cerr << "Error: can't accept client!" << std::endl;
 	}
 	else
 	{
 		FD_SET(newSockfd, &m_master);
-		std::cout << "Connected new client. ";
+		std::cout << "Connected new client. Socket#" << newSockfd << "\n";
 		displayInfo("Client", (sockaddr_in*)&remoteAddr);
 	}
 	return newSockfd;
@@ -121,6 +122,34 @@ void Listener::removeSocket(int sockfd)
 {
 	FD_CLR(sockfd, &m_master);
 	close(sockfd);
+}
+
+void Listener::receiveFile(int sourceSockfd, const std::string& fileName)
+{
+	unsigned int maxBufferSize {1024};
+	char buffer [maxBufferSize];
+
+	while(true)
+	{
+		memset(buffer, 0, maxBufferSize);
+		long int bytesReceived {recv(sourceSockfd, buffer, maxBufferSize, 0)};
+		if(bytesReceived <= -1)
+		{
+			std::cerr << "Error: receiving data! Socket #" << sourceSockfd << std::endl;
+			break;
+		}
+		else if(bytesReceived == 0)
+		{
+			std::cout << "Client disconnected. Socket #" << sourceSockfd << "\n";
+			sendMsg(sourceSockfd, "Disconnecting from server.\n");
+			removeSocket(sourceSockfd);
+			break;
+		}
+		else
+		{
+			sendAll(sourceSockfd, buffer);
+		}
+	}
 }
 
 void Listener::sendAll(int sourceSockfd, const std::string& msg)
@@ -157,7 +186,7 @@ void Listener::run()
 	int listenResult {createListeningSocket()};
 	if(listenResult <= -1)
 	{
-		std::cerr << "Error:  can't create listening socket!" << std::endl;
+		std::cerr << "Error: can't create listening socket!" << std::endl;
 		return;
 	}
 	m_sockfdCount = m_listenSockfd;
@@ -198,29 +227,38 @@ void Listener::run()
 					memset(buffer, 0, maxBufferSize);
 					
 					long int bytesReceived {recv(sockfdItr, buffer, maxBufferSize, 0)};
-
-					std::string dataReceived {buffer};
-
-					if(dataReceived == "/sendfile")
+					if(bytesReceived <= -1)
 					{
-						std::cout << "Waiting for the file.\n";
+						std::cerr << "Error: receiving data! Socket #" << sockfdItr << std::endl;
+					}
+					else if(bytesReceived == 0)
+					{
+						std::cout << "Client disconnected. Socket #" << sockfdItr << "\n";
+						sendMsg(sockfdItr, "Disconnecting from server.\n");
+						removeSocket(sockfdItr);
 					}
 					else
 					{
-						if(bytesReceived <= -1)
+						std::string receivedData {buffer};
+						std::cout << "CLIENT #" << sockfdItr << "> " << receivedData << "\n";
+
+						if(receivedData.find("/sendfile") == 0)
 						{
-							std::cerr << "Error: receiving data! Socket #" << sockfdItr << std::endl;
-						}
-						else if(bytesReceived == 0)
-						{
-							std::cout << "Client disconnected. Socket #" << sockfdItr << "\n";
-							sendMsg(sockfdItr, "Disconnecting from server.\n");
-							removeSocket(sockfdItr);
+							std::cout << "### requested /sendfile\n";
+
+							std::string fileName {receivedData.begin() + receivedData.find_first_not_of("/sendfile "), receivedData.end()};
+							std::cout << "filename: " << fileName << "\n";
+
+							sendAll(sockfdItr, "/receivefile " + fileName);
+
+							std::thread t1 = std::thread{[&](){
+								receiveFile(sockfdItr, fileName);
+							}};
+							t1.join();
 						}
 						else
 						{
-							std::cout << "Data received: " << buffer << "\n";
-							sendAll(sockfdItr, buffer);
+							sendAll(sockfdItr, receivedData);
 						}
 					}
 				}

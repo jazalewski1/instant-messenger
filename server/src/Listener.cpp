@@ -144,7 +144,6 @@ void Listener::run()
 	unsigned int maxBufferSize {4096};
 	char buffer [maxBufferSize];
 	
-	memset(buffer, 0, maxBufferSize);
 
 	while(true)
 	{
@@ -155,6 +154,7 @@ void Listener::run()
 			std::cerr << "Error: selecting socket!" << std::endl;
 			break;	
 		}
+
 
 		for(int sockfdItr {0}; sockfdItr <= m_sockfdCount; ++sockfdItr)
 		{
@@ -170,6 +170,8 @@ void Listener::run()
 				}
 				else
 				{
+					memset(buffer, 0, maxBufferSize);
+					
 					long int bytesReceived {recv(sockfdItr, buffer, maxBufferSize, 0)};
 					if(bytesReceived <= -1)
 					{

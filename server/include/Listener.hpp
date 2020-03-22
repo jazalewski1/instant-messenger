@@ -2,11 +2,12 @@
 
 #include <arpa/inet.h>
 #include <iostream>
+#include <netdb.h>
 #include <sys/socket.h>
 #include <string>
 #include <string.h>
 #include <sys/select.h>
-#include <netdb.h>
+#include <thread>
 #include <unistd.h>
 
 class Listener
@@ -17,6 +18,8 @@ private:
 	int m_listenSockfd;
 	fd_set m_master;
 	int m_sockfdCount;
+	bool m_isThreadRunning;
+	std::thread m_thread;
 
 private:
 	int createListeningSocket();
@@ -33,6 +36,8 @@ public:
 	Listener(int portNumber);
 
 	~Listener();
+	
+	void startRunning();
 
 	void run();
 

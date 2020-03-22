@@ -13,7 +13,7 @@ add_executable(Server ${SOURCES})
 
 target_include_directories(Server PUBLIC include)
 
-# find_package(Threads)
-# target_link_libraries(Server ${CMAKE_THREAD_LIBS_INIT})
+find_package(Threads)
+target_link_libraries(Server ${CMAKE_THREAD_LIBS_INIT})
 
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)

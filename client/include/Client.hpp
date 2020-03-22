@@ -2,6 +2,7 @@
 
 #include <arpa/inet.h>
 #include <string>
+#include <thread>
 
 class Client
 {
@@ -10,6 +11,8 @@ private:
 	int m_serverPortNumber;
 	int m_sockfd;
 	sockaddr_in m_hint;
+	bool m_isReceiveThreadRunning;
+	std::thread m_receiveThread;
 
 	int createSocket();
 
@@ -23,6 +26,10 @@ public:
 	~Client();
 
 	void run();
+
+	void startReceiving();
+
+	void receive();
 
 	static void displayInfo(const std::string& name, sockaddr_in* saddrPtr);
 };

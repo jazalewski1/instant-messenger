@@ -9,15 +9,23 @@
 #include <unistd.h>
 
 Client::Client(const std::string& ipAddress, int portNumber) :
-	m_serverIpAddress{ipAddress}, m_serverPortNumber{portNumber}
+	m_serverIpAddress{ipAddress}, m_serverPortNumber{portNumber},
+	m_isReceiveThreadRunning{false}
 {
 	// std::cout << "Client constructor.\n";
 }
 
 Client::~Client()
 {
-	close(m_sockfd);
 	// std::cout << "Client destructor.\n";
+	if(m_isReceiveThreadRunning && m_receiveThread.joinable())
+	{
+		m_isReceiveThreadRunning = false;
+		m_receiveThread.join();
+	}
+	close(m_sockfd);
+
+	std::cout << "Closing." << std::endl;
 }
 
 int Client::createSocket()
@@ -39,12 +47,46 @@ long int Client::sendAll(const std::string& msg)
 	return send(m_sockfd, msg.c_str(), static_cast<int>(msg.length()), 0);
 }
 
+void Client::startReceiving()
+{
+	m_receiveThread = std::thread {[&]() { receive(); }};
+	m_receiveThread.detach();
+}
+
+void Client::receive()
+{
+	unsigned int bufferSize {4096};
+	char receiveBuffer [bufferSize];
+
+	m_isReceiveThreadRunning = true;
+	while(m_isReceiveThreadRunning)
+	{
+		memset(receiveBuffer, 0, bufferSize);
+
+		long int receivedBytes {recv(m_sockfd, receiveBuffer, static_cast<int>(bufferSize), 0)};
+		if(receivedBytes == -1)
+		{
+			std::cerr << "Error: can't receive data." << std::endl;
+			return;
+		}
+		else if(receivedBytes == 0)
+		{
+			std::cerr << "Server shut down." << std::endl;
+			break;
+		}
+		else
+		{
+			std::cout << "SERVER> " << std::string(receiveBuffer, 0, receivedBytes) << "\n";
+		}
+	}
+}
+
 void Client::run()
 {
 	m_sockfd = createSocket();
 	if(m_sockfd == -1)
 	{
-		std::cerr << "Error: create a socket!" << std::endl;
+		std::cerr << "Error: can't create a socket!" << std::endl;
 		return;
 	}
 
@@ -52,18 +94,16 @@ void Client::run()
 	int connectResult {conn()};
 	if(connectResult <= -1)
 	{
-		std::cerr << "Error: connect to server!" << std::endl;
+		std::cerr << "Error: can't connect to server!" << std::endl;
 		return;
 	}
 
 	std::cout << "Connected.\n";
 	displayInfo("Server", &m_hint);
 
+	startReceiving();
 
-	unsigned int bufferSize {4096};
-	char receiveBuffer [bufferSize];
 	std::string input;
-
 	std::cout << "(type \"/close\" to disconnect)\n\n";
 
 	while(true)
@@ -72,31 +112,18 @@ void Client::run()
 		getline(std::cin, input);
 
 		if(input == "/close")
-		{
-			std::cout << "Disconnecting..." << std::endl;
 			break;
-		}
 
 		long int sentBytes {sendAll(input)};
 		if(sentBytes == -1)
 		{
-			std::cerr << "Error in sending data." << std::endl;
+			std::cerr << "Error: can't send data." << std::endl;
 			break;
 		}
-		else
+		else if(sentBytes == 0)
 		{
-			memset(receiveBuffer, 0, bufferSize);
-
-			long int receivedBytes {recv(m_sockfd, receiveBuffer, static_cast<int>(bufferSize), 0)};
-			if(receivedBytes == -1)
-			{
-				std::cerr << "Error receiving data." << std::endl;
-				break;
-			}
-			else
-			{
-				std::cout << "SERVER> " << std::string(receiveBuffer, 0, receivedBytes) << "\n";
-			}
+			std::cout << "Disconnecting..." << std::endl;
+			break;
 		}
 	}
 }

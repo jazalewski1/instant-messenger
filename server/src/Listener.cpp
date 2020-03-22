@@ -10,14 +10,17 @@
 
 
 Listener::Listener(int portNumber) :
-	m_port{std::to_string(portNumber)}, m_sockfdCount{0}
+	m_port{std::to_string(portNumber)}, 
+	m_listenSockfd{-1}, m_sockfdCount{0},
+	m_isThreadRunning{false}
 {
 	// std::cout << "Listener constructor.\n";
 }
 
 Listener::~Listener()
 {
-	std::string msg {"Server is shutting down. Disconnecting."};
+	// std::cout << "Listener destructor.\n";
+	std::string msg {"Server is shutting down."};
 	for(int sockfdItr {0}; sockfdItr <= m_sockfdCount; ++sockfdItr)
 	{
 		if(FD_ISSET(sockfdItr, &m_master))
@@ -30,9 +33,19 @@ Listener::~Listener()
 		}
 	}
 
-	removeSocket(m_listenSockfd);
+	if(m_listenSockfd != -1)
+	{
+		removeSocket(m_listenSockfd);
+	}
 
-	// std::cout << "Listener destructor.\n";
+	if(m_isThreadRunning && m_thread.joinable())
+	{
+		m_isThreadRunning = false;
+
+		m_thread.join();
+	}
+
+	std::cout << "Closing.\n";
 }
 
 int Listener::createListeningSocket()
@@ -87,7 +100,7 @@ int Listener::acceptClient()
 
 	if(newSockfd <= -1)
 	{
-		std::cerr << "Error: accepting client!" << std::endl;
+		std::cerr << "Error:  can't accept client!" << std::endl;
 	}
 	else
 	{
@@ -123,8 +136,14 @@ void Listener::sendMsg(int receiverSockfd, const std::string& msg)
 	long int bytesSent {send(receiverSockfd, msg.c_str(), msg.size(), 0)};
 	if(bytesSent <= -1)
 	{
-		std::cerr << "Error: sending message!" << std::endl;
+		std::cerr << "Error: can't send message!" << std::endl;
 	}
+}
+
+void Listener::startRunning()
+{
+	m_thread = std::thread{[&]() { this->run(); }};
+	m_thread.detach();
 }
 
 void Listener::run()
@@ -132,26 +151,26 @@ void Listener::run()
 	int listenResult {createListeningSocket()};
 	if(listenResult <= -1)
 	{
-		std::cerr << "Error: creating listening socket! Error# " << listenResult << std::endl;
+		std::cerr << "Error:  can't create listening socket!" << std::endl;
 		return;
 	}
+	m_sockfdCount = m_listenSockfd;
 
 	FD_ZERO(&m_master);
 	FD_SET(m_listenSockfd, &m_master);
 
-	m_sockfdCount = m_listenSockfd;
 
 	unsigned int maxBufferSize {4096};
 	char buffer [maxBufferSize];
 	
-
-	while(true)
+	m_isThreadRunning = true;
+	while(m_isThreadRunning)
 	{
 		fd_set copySet {m_master};
 		int socketCount {select(m_sockfdCount + 1, &copySet, nullptr, nullptr, nullptr)};
 		if(socketCount == -1)
 		{
-			std::cerr << "Error: selecting socket!" << std::endl;
+			std::cerr << "Error: select socket!" << std::endl;
 			break;	
 		}
 
@@ -180,6 +199,7 @@ void Listener::run()
 					else if(bytesReceived == 0)
 					{
 						std::cout << "Client disconnected. Socket #" << sockfdItr << "\n";
+						sendMsg(sockfdItr, "Disconnecting from server.\n");
 						removeSocket(sockfdItr);
 					}
 					else
@@ -189,7 +209,6 @@ void Listener::run()
 				}
 			}
 		}
-
 	}
 }
 

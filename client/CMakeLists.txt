@@ -11,6 +11,9 @@ set(SOURCES
 
 add_executable(Client ${SOURCES})
 
+find_package(Threads)
+target_link_libraries(Client ${CMAKE_THREAD_LIBS_INIT})
+
 target_include_directories(Client PUBLIC include)
 
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)

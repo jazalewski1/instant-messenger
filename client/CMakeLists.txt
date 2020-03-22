@@ -4,8 +4,13 @@ project(Client LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 14)
 
-add_executable(Client src/Main.cpp)
+set(SOURCES 
+	src/Main.cpp
+	src/Client.cpp
+)
 
-target_include_directories(Client PRIVATE include)
+add_executable(Client ${SOURCES})
+
+target_include_directories(Client PUBLIC include)
 
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)

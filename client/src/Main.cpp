@@ -7,6 +7,21 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+void displayInfo(const std::string& name, sockaddr_in* saddrPtr)
+{
+	char ip [NI_MAXHOST];
+	memset(ip, 0, NI_MAXHOST);
+	char port [NI_MAXSERV];
+	memset(port, 0, NI_MAXSERV);
+
+	getnameinfo((sockaddr*)&saddrPtr, sizeof(sockaddr_in), 
+				ip, NI_MAXHOST, 
+				nullptr, 0, 0);
+
+	inet_ntop(AF_INET, &saddrPtr->sin_addr, ip, NI_MAXHOST);
+	std::cout << name << "IP: " << ip << ", port: " << ntohs(saddrPtr->sin_port) << "\n";
+}
+
 int main(int argc, char* argv[])
 {
 	if(argc != 3)
@@ -42,17 +57,8 @@ int main(int argc, char* argv[])
 		return -2;
 	}
 
-	char serverName [NI_MAXHOST];
-	memset(serverName, 0, NI_MAXHOST);
-	char serverServiceName [NI_MAXSERV];
-	memset(serverServiceName, 0, NI_MAXSERV);
-
-	getnameinfo((sockaddr*)&hint, sizeof(hint), 
-				serverName, NI_MAXHOST, 
-				serverServiceName, NI_MAXSERV, 0);
-
-	inet_ntop(AF_INET, &hint.sin_addr, serverName, NI_MAXHOST);
-	std::cout << "Connected.\nServer IP: " << serverName << ", port: " << ntohs(hint.sin_port) << "\n\n";
+	std::cout << "Connected.\n";
+	displayInfo("Server", &hint);
 
 	unsigned int bufferSize {4096};
 	char receiveBuffer [bufferSize];

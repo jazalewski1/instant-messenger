@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD 14)
 
 set(SOURCES
 	src/Main.cpp
+	src/Listener.cpp
 )
 
 add_executable(Server ${SOURCES})

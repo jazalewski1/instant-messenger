@@ -15,18 +15,16 @@ Listener::Listener(int portNumber) :
 	m_listenSockfd{-1}, m_sockfdCount{0},
 	m_isThreadRunning{false}
 {
-	// std::cout << "Listener constructor.\n";
 }
 
 Listener::~Listener()
 {
-	// std::cout << "Listener destructor.\n";
 	std::string msg {"Server is shutting down."};
 	for(int sockfdItr {0}; sockfdItr <= m_sockfdCount; ++sockfdItr)
 	{
 		if(FD_ISSET(sockfdItr, &m_master))
 		{
-			if(sockfdItr != m_listenSockfd) // Don't send to listening socket
+			if(sockfdItr != m_listenSockfd)
 			{
 				sendMsg(sockfdItr, msg);
 				removeSocket(sockfdItr);
@@ -46,7 +44,7 @@ Listener::~Listener()
 		m_thread.join();
 	}
 
-	std::cout << "Closing.\n";
+	std::cout << "Closing." << std::endl;
 }
 
 int Listener::createListeningSocket()
@@ -112,7 +110,7 @@ int Listener::acceptClient()
 	else
 	{
 		FD_SET(newSockfd, &m_master);
-		std::cout << "Connected new client. Socket#" << newSockfd << "\n";
+		std::cout << "Connected new client. Socket #" << newSockfd << std::endl;
 		displayInfo("Client", (sockaddr_in*)&remoteAddr);
 	}
 	return newSockfd;
@@ -140,16 +138,22 @@ void Listener::receiveFile(int sourceSockfd, const std::string& fileName)
 		}
 		else if(bytesReceived == 0)
 		{
-			std::cout << "Client disconnected. Socket #" << sourceSockfd << "\n";
-			sendMsg(sourceSockfd, "Disconnecting from server.\n");
+			std::cout << "Client disconnected. Socket #" << sourceSockfd << std::endl;
+			sendMsg(sourceSockfd, "Disconnecting from server.");
 			removeSocket(sourceSockfd);
 			break;
 		}
 		else
 		{
+			std::string data {buffer};
+			if(data == "/endfile")
+				break;
+
 			sendAll(sourceSockfd, buffer);
 		}
 	}
+	std::cout << "Finished sending file.\n";
+	sendAll(sourceSockfd, "/endfile");
 }
 
 void Listener::sendAll(int sourceSockfd, const std::string& msg)
@@ -158,10 +162,8 @@ void Listener::sendAll(int sourceSockfd, const std::string& msg)
 	{
 		if(FD_ISSET(sockfdItr, &m_master))
 		{
-			if(sockfdItr != m_listenSockfd && sockfdItr != sourceSockfd) // Don't send to listening socket and source
-			{
+			if(sockfdItr != m_listenSockfd && sockfdItr != sourceSockfd)
 				sendMsg(sockfdItr, msg);
-			}
 		}
 	}
 }
@@ -218,9 +220,7 @@ void Listener::run()
 				{
 					int newSockfd {acceptClient()};
 					if(newSockfd > m_sockfdCount)
-					{
 						m_sockfdCount = newSockfd;
-					}
 				}
 				else
 				{
@@ -233,33 +233,27 @@ void Listener::run()
 					}
 					else if(bytesReceived == 0)
 					{
-						std::cout << "Client disconnected. Socket #" << sockfdItr << "\n";
-						sendMsg(sockfdItr, "Disconnecting from server.\n");
+						std::cout << "Client disconnected. Socket #" << sockfdItr << std::endl;
+						sendMsg(sockfdItr, "Disconnecting from server.");
 						removeSocket(sockfdItr);
 					}
 					else
 					{
 						std::string receivedData {buffer};
-						std::cout << "CLIENT #" << sockfdItr << "> " << receivedData << "\n";
+						std::cout << "CLIENT #" << sockfdItr << "> " << receivedData << std::endl;
 
 						if(receivedData.find("/sendfile") == 0)
 						{
-							std::cout << "### requested /sendfile\n";
+							std::cout << "Transfering file." << std::endl;
 
 							std::string fileName {receivedData.begin() + receivedData.find_first_not_of("/sendfile "), receivedData.end()};
-							std::cout << "filename: " << fileName << "\n";
+							std::cout << "Filename: " << fileName << std::endl;
 
 							sendAll(sockfdItr, "/receivefile " + fileName);
-
-							std::thread t1 = std::thread{[&](){
-								receiveFile(sockfdItr, fileName);
-							}};
-							t1.join();
+							receiveFile(sockfdItr, fileName);
 						}
 						else
-						{
 							sendAll(sockfdItr, receivedData);
-						}
 					}
 				}
 			}
@@ -279,5 +273,5 @@ void Listener::displayInfo(const std::string& name, sockaddr_in* saddrPtr)
 				nullptr, 0, 0);
 
 	inet_ntop(AF_INET, &saddrPtr->sin_addr, ip, NI_MAXHOST);
-	std::cout << name << "IP: " << ip << ", port: " << ntohs(saddrPtr->sin_port) << "\n";
+	std::cout << name << "IP: " << ip << ", port: " << ntohs(saddrPtr->sin_port) << std::endl;
 }

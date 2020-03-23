@@ -1,24 +1,25 @@
 #include <Client.hpp>
 #include <algorithm>
+#include <chrono>
 #include <arpa/inet.h>
 #include <iostream>
+#include <fstream>
 #include <netdb.h>
 #include <string>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <vector>
 
 Client::Client(const std::string& ipAddress, int portNumber) :
 	m_serverIpAddress{ipAddress}, m_serverPortNumber{portNumber},
 	m_isReceiveThreadRunning{false}
 {
-	// std::cout << "Client constructor.\n";
 }
 
 Client::~Client()
 {
-	// std::cout << "Client destructor.\n";
 	if(m_isReceiveThreadRunning && m_receiveThread.joinable())
 	{
 		m_isReceiveThreadRunning = false;
@@ -72,22 +73,17 @@ void Client::receive()
 		}
 		else
 		{
-			std::string receivedData {buffer, 0, receivedBytes};
+			std::string receivedData {buffer, 0, static_cast<long unsigned int>(receivedBytes)};
 			if(receivedData[0] == '/')
 			{
-				std::cout << "### requested receive data\n";
 				std::string fileName {receivedData.begin() + receivedData.find_first_not_of("/receivefile "), receivedData.end()};
-				std::cout << "filename: >" << fileName << "<\n";
-
+				std::cout << "Filename: >" << fileName << "<" << std::endl;
+				
 				receiveFile(fileName);
-				// std::thread t1 {[&](){
-				// }};
-				// t1.join();
 			}
 			else
 			{
-				// Normal message, just print
-				std::cout << "SERVER> " << receivedData << "\n";
+				std::cout << "CHAT> " << receivedData << "" << std::endl;
 			}
 		}
 	}
@@ -95,28 +91,25 @@ void Client::receive()
 
 void Client::receiveFile(const std::string& fileName)
 {
-	std::cout << "Opening a new file.\n";
-	FILE* filePtr;
-	filePtr = fopen(fileName.c_str(), "ab");
+	std::cout << "Opening a new file." << std::endl;
+	std::ofstream outFile;
+	outFile.open("result/" + fileName);
 
-	if(filePtr == nullptr)
+	if(!outFile.is_open())
 	{
 		std::cerr << "Error: can't create file!" << std::endl;
 	}
 	else
 	{
-		unsigned int bufferSize {1024};
+		unsigned int bufferSize {4096};
 		char buffer [bufferSize];
 
 		long int totalReceivedBytes {0};
-		std::cout << "Entering receiving loop.\n";
 		while(true)
 		{
-			std::cout << "loop\n";
 			memset(buffer, 0, bufferSize);
 
 			long int receivedBytes {recv(m_sockfd, buffer, bufferSize, 0)};
-			std::cout << "received bytes: " << receivedBytes << "\n";
 			if(receivedBytes <= -1)
 			{
 				std::cerr << "Error: can't receive data!" << std::endl;
@@ -129,62 +122,26 @@ void Client::receiveFile(const std::string& fileName)
 			}
 			else
 			{
-				std::cout << "fflush\n";
-				fflush(stdout);
-				std::cout << "fwrite\n";
-				fwrite(buffer, 1, receivedBytes, filePtr);
-
-				std::cout << "after fwrite\n";
-				totalReceivedBytes += receivedBytes;
+				std::string str {buffer};
+				if(str == "/endfile")
+				{
+					break;
+				}
+				else
+				{
+					outFile << buffer << std::endl;
+					totalReceivedBytes += receivedBytes;
+				}
 			}
 		}
-		std::cout << "Finished reading to file.\n";
-		fclose(filePtr);
+		std::cout << "Total received bytes: " << totalReceivedBytes << std::endl;
+		outFile.close();
 	}
 }
 
 long int Client::sendData(const std::string& msg)
 {
 	return send(m_sockfd, msg.c_str(), static_cast<int>(msg.length()), 0);
-}
-
-void Client::startSendingFile(FILE* filePtr)
-{
-	std::thread t {[&](){
-		sendFile(filePtr);
-	}};
-	t.join();
-}
-
-void Client::sendFile(FILE* filePtr)
-{
-	long int totalSentBytes {0};
-	while(true)
-	{
-		unsigned char buffer [1024];
-		memset(buffer, 0, 1024);
-
-		long unsigned int readBytes {fread(buffer, 1, 1024, filePtr)};
-		if(readBytes > 0)
-		{
-			long int sentBytes {send(m_sockfd, buffer, readBytes, 0)};
-			totalSentBytes += sentBytes;
-			if(sentBytes <= -1)
-			{
-				std::cerr << "Error: can't send data!" << std::endl;
-			}
-		}
-		else if(readBytes < 1024)
-		{
-			if(feof(filePtr))
-				std::cout << "End of file.\n";
-			else if(ferror(filePtr))
-				std::cerr << "Error: can't read file!" << std::endl;
-			break;
-		}
-	}
-
-	std::cout << "Total bytes sent: " << totalSentBytes << "\n";
 }
 
 void Client::run()
@@ -196,7 +153,7 @@ void Client::run()
 		return;
 	}
 
-	std::cout << "Connecting to server...\n\n";
+	std::cout << "Connecting to server..." << std::endl;
 	int connectResult {conn()};
 	if(connectResult <= -1)
 	{
@@ -204,14 +161,14 @@ void Client::run()
 		return;
 	}
 
-	std::cout << "Connected.\n";
+	std::cout << "Connected." << std::endl;
 	displayInfo("Server", &m_hint);
 
 	startReceiving();
 
 	std::string input;
-	std::cout << "\n(type \"/close\" to disconnect)\n";
-	std::cout << "(type \"/sendfile <fileName>\" to send a file)\n\n";
+	std::cout << "\n(type \"/close\" to disconnect)" << std::endl;
+	std::cout << "(type \"/sendfile <fileName>\" to send a file)" << std::endl;
 
 	while(true)
 	{
@@ -244,17 +201,18 @@ void Client::run()
 					{
 						std::string fileName {whiteItr + 1, input.end()};
 
-						std::cout << "Opening file.\n";
-						FILE* filePtr;
-						filePtr = fopen(fileName.c_str(), "r");
+						std::cout << "Opening file." << std::endl;
+						std::ifstream inFile;
+						inFile.open(fileName);
 
-						if(filePtr == nullptr)
+						if(!inFile.is_open())
 						{
 							std::cerr << "Error: can't open file: " << fileName << "!" << std::endl;
 						}
 						else
 						{
 							long int sentBytes {sendData(input)};
+							std::this_thread::sleep_for(std::chrono::milliseconds(100));
 							if(sentBytes == -1)
 							{
 								std::cerr << "Error: can't send data." << std::endl;
@@ -265,15 +223,39 @@ void Client::run()
 								std::cout << "Disconnecting..." << std::endl;
 								break;
 							}
+							else
+							{
+								std::cout << "Start reading from file." << std::endl;
+								std::vector<char> buffer (1024, 0);
 
-							startSendingFile(filePtr);
+								inFile.read(buffer.data(), buffer.size());
+								std::streamsize s = inFile.gcount();
+
+								while(s > 0)
+								{
+									long int sentBytes {send(m_sockfd, buffer.data(), 1024, 0)};
+									if(sentBytes <= -1)
+									{
+										std::cerr << "Error: can't send data!" << std::endl;
+									}
+									else if(sentBytes == 0)
+									{
+
+									}
+
+									inFile.read(buffer.data(), buffer.size());
+									s = inFile.gcount();
+								}
+
+								std::cout << "Finished reading file." << std::endl;
+								std::this_thread::sleep_for(std::chrono::milliseconds(100));
+								sendData("/endfile");
+							}
 						}
 					}
 				}
 				else
-				{
 					std::cerr << "Unknown command: " << command << std::endl;
-				}
 			}
 			else
 			{
@@ -304,5 +286,5 @@ void Client::displayInfo(const std::string& name, sockaddr_in* saddrPtr)
 	getnameinfo((sockaddr*)&saddrPtr, sizeof(sockaddr_in), ip, NI_MAXHOST, nullptr, 0, 0);
 
 	inet_ntop(AF_INET, &saddrPtr->sin_addr, ip, NI_MAXHOST);
-	std::cout << name << " IP: " << ip << ", port: " << ntohs(saddrPtr->sin_port) << "\n";
+	std::cout << name << " IP: " << ip << ", port: " << ntohs(saddrPtr->sin_port) << std::endl;
 }

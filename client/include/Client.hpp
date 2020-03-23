@@ -26,10 +26,6 @@ private:
 
 	long int sendData(const std::string& msg);
 
-	void startSendingFile(FILE* filePtr);
-
-	void sendFile(FILE* filePtr);
-
 public:
 	Client(const std::string& ipAddress, int portNumber);
 

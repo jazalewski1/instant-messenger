@@ -1,5 +1,4 @@
 #include <Listener.hpp>
-#include <algorithm>
 #include <arpa/inet.h>
 #include <iostream>
 #include <sys/socket.h>
@@ -9,44 +8,28 @@
 #include <netdb.h>
 #include <unistd.h>
 
-
 Listener::Listener(int portNumber) :
 	m_port{std::to_string(portNumber)}, 
-	m_listenSockfd{-1}, m_sockfdCount{0},
-	m_isThreadRunning{false}
+	m_listeningSockfd{-1}, m_sockfdCount{0}
 {
 }
 
 Listener::~Listener()
 {
-	std::string msg {"Server is shutting down."};
 	for(int sockfdItr {0}; sockfdItr <= m_sockfdCount; ++sockfdItr)
 	{
 		if(FD_ISSET(sockfdItr, &m_master))
 		{
-			if(sockfdItr != m_listenSockfd)
-			{
-				sendMsg(sockfdItr, msg);
+			if(sockfdItr != m_listeningSockfd)
 				removeSocket(sockfdItr);
-			}
 		}
 	}
 
-	if(m_listenSockfd != -1)
-	{
-		removeSocket(m_listenSockfd);
-	}
-
-	if(m_isThreadRunning && m_thread.joinable())
-	{
-		m_isThreadRunning = false;
-
-		m_thread.join();
-	}
-
-	std::cout << "Closing." << std::endl;
+	if(m_listeningSockfd != -1)
+		removeSocket(m_listeningSockfd);
 }
 
+// RETURNS: 0 on success, -1 on getaddrinfo() error, -2 on binding error
 int Listener::createListeningSocket()
 {
 	memset(&m_hint, 0, sizeof(m_hint));
@@ -63,56 +46,55 @@ int Listener::createListeningSocket()
 	addrinfo* listResult;
 	for(listResult = listBegin; listResult != nullptr; listResult = listResult->ai_next)
 	{
-		m_listenSockfd = socket(listResult->ai_family, listResult->ai_socktype, listResult->ai_protocol);
-		if(m_listenSockfd == -1)
+		m_listeningSockfd = socket(listResult->ai_family, listResult->ai_socktype, listResult->ai_protocol);
+		if(m_listeningSockfd == -1)
 			continue;
 
 		int sockopt {1};
-		if(setsockopt(m_listenSockfd, SOL_SOCKET, SO_REUSEADDR, &sockopt, sizeof(sockopt)) == -1)
-		{
-			std::cerr << "Error: setsockopt." << std::endl;
-		}
+		setsockopt(m_listeningSockfd, SOL_SOCKET, SO_REUSEADDR, &sockopt, sizeof(sockopt));
 
-		int bindResult {bind(m_listenSockfd, listResult->ai_addr, listResult->ai_addrlen)};
-		if(bindResult == -1)
-		{
-			close(m_listenSockfd);
-			continue;
-		}
+		int bindResult {bind(m_listeningSockfd, listResult->ai_addr, listResult->ai_addrlen)};
+		if(bindResult == 0)
+			break;
 
-		break;
+		close(m_listeningSockfd);
 	}
 
 	if(listResult == nullptr)
-		return -1;
+		return -2;
 
 	freeaddrinfo(listBegin);
 
 	displayInfo("Server", (sockaddr_in*)listResult->ai_addr);
-
-	int listenResult {listen(m_listenSockfd, 4)};
-	if(listenResult <= -1)
-		return listenResult;
-
-	return m_listenSockfd;
+	return 0;
 }
 
-int Listener::acceptClient()
+int Listener::startListening()
+{
+	int listeningResult {listen(m_listeningSockfd, 2)};
+	if(listeningResult <= -1)
+		return -1;
+
+	m_sockfdCount = m_listeningSockfd;
+
+	FD_ZERO(&m_master);
+	FD_SET(m_listeningSockfd, &m_master);
+
+	return 0;
+}
+
+int Listener::acceptHost()
 {
 	sockaddr_storage remoteAddr;
 	socklen_t addrSize {sizeof(remoteAddr)};
-	int newSockfd {accept(m_listenSockfd, (sockaddr*)&remoteAddr, &addrSize)};
 
+	int newSockfd {accept(m_listeningSockfd, (sockaddr*)&remoteAddr, &addrSize)};
 	if(newSockfd <= -1)
-	{
-		std::cerr << "Error: can't accept client!" << std::endl;
-	}
-	else
-	{
-		FD_SET(newSockfd, &m_master);
-		std::cout << "Connected new client. Socket #" << newSockfd << std::endl;
-		displayInfo("Client", (sockaddr_in*)&remoteAddr);
-	}
+		return -1;
+
+	FD_SET(newSockfd, &m_master);
+	displayInfo("Client", (sockaddr_in*)&remoteAddr);
+
 	return newSockfd;
 }
 
@@ -122,141 +104,73 @@ void Listener::removeSocket(int sockfd)
 	close(sockfd);
 }
 
-void Listener::receiveFile(int sourceSockfd, const std::string& fileName)
+// RETURNS: 0 on success, -1 on select() error, -2 on acceptHost() error
+int Listener::poll()
 {
-	unsigned int maxBufferSize {1024};
+	unsigned int maxBufferSize {4096};
 	char buffer [maxBufferSize];
 
-	while(true)
-	{
-		memset(buffer, 0, maxBufferSize);
-		long int bytesReceived {recv(sourceSockfd, buffer, maxBufferSize, 0)};
-		if(bytesReceived <= -1)
-		{
-			std::cerr << "Error: receiving data! Socket #" << sourceSockfd << std::endl;
-			break;
-		}
-		else if(bytesReceived == 0)
-		{
-			std::cout << "Client disconnected. Socket #" << sourceSockfd << std::endl;
-			sendMsg(sourceSockfd, "Disconnecting from server.");
-			removeSocket(sourceSockfd);
-			break;
-		}
-		else
-		{
-			std::string data {buffer};
-			if(data == "/endfile")
-				break;
+	fd_set copySet {m_master};
 
-			sendAll(sourceSockfd, buffer);
+	timeval timeout;
+	timeout.tv_usec = 1000;
+	int socketCount {select(m_sockfdCount + 1, &copySet, nullptr, nullptr, &timeout)};
+	if(socketCount == -1)
+		return -1;
+
+	for(int sockfdItr {0}; sockfdItr <= m_sockfdCount; ++sockfdItr)
+	{
+		if(FD_ISSET(sockfdItr, &copySet))
+		{
+			if(sockfdItr == m_listeningSockfd)
+			{
+				int newSockfd {acceptHost()};
+				if(newSockfd <= -1)
+					return -2;
+
+				if(newSockfd > m_sockfdCount)
+					m_sockfdCount = newSockfd;
+
+				std::cout << "Connected new client. Socket #" << newSockfd << std::endl;
+			}
+			else
+			{
+				memset(buffer, 0, maxBufferSize);
+				
+				long int bytesReceived {recv(sockfdItr, buffer, maxBufferSize, 0)};
+				receiveHandler(buffer, bytesReceived, sockfdItr);
+			}
 		}
 	}
-	std::cout << "Finished sending file.\n";
-	sendAll(sourceSockfd, "/endfile");
+
+	return 0;
 }
 
-void Listener::sendAll(int sourceSockfd, const std::string& msg)
+long int Listener::sendMsg(int receiverSockfd, const std::string& msg)
+{
+	return send(receiverSockfd, msg.c_str(), msg.size(), 0);
+}
+
+long int Listener::sendAll(const std::string& msg)
 {
 	for(int sockfdItr {0}; sockfdItr <= m_sockfdCount; ++sockfdItr)
 	{
 		if(FD_ISSET(sockfdItr, &m_master))
 		{
-			if(sockfdItr != m_listenSockfd && sockfdItr != sourceSockfd)
+			if(sockfdItr != m_listeningSockfd)
 				sendMsg(sockfdItr, msg);
 		}
 	}
 }
 
-void Listener::sendMsg(int receiverSockfd, const std::string& msg)
+long int Listener::sendAllExcept(int exceptSockfd, const std::string& msg)
 {
-	long int bytesSent {send(receiverSockfd, msg.c_str(), msg.size(), 0)};
-	if(bytesSent <= -1)
+	for(int sockfdItr {0}; sockfdItr <= m_sockfdCount; ++sockfdItr)
 	{
-		std::cerr << "Error: can't send message!" << std::endl;
-	}
-}
-
-void Listener::startRunning()
-{
-	m_thread = std::thread{[&]() { this->run(); }};
-	m_thread.detach();
-}
-
-void Listener::run()
-{
-	int listenResult {createListeningSocket()};
-	if(listenResult <= -1)
-	{
-		std::cerr << "Error: can't create listening socket!" << std::endl;
-		return;
-	}
-	m_sockfdCount = m_listenSockfd;
-
-	FD_ZERO(&m_master);
-	FD_SET(m_listenSockfd, &m_master);
-
-
-	unsigned int maxBufferSize {4096};
-	char buffer [maxBufferSize];
-	
-	m_isThreadRunning = true;
-	while(m_isThreadRunning)
-	{
-		fd_set copySet {m_master};
-		int socketCount {select(m_sockfdCount + 1, &copySet, nullptr, nullptr, nullptr)};
-		if(socketCount == -1)
+		if(FD_ISSET(sockfdItr, &m_master))
 		{
-			std::cerr << "Error: select socket!" << std::endl;
-			break;	
-		}
-
-
-		for(int sockfdItr {0}; sockfdItr <= m_sockfdCount; ++sockfdItr)
-		{
-			if(FD_ISSET(sockfdItr, &copySet))
-			{
-				if(sockfdItr == m_listenSockfd)
-				{
-					int newSockfd {acceptClient()};
-					if(newSockfd > m_sockfdCount)
-						m_sockfdCount = newSockfd;
-				}
-				else
-				{
-					memset(buffer, 0, maxBufferSize);
-					
-					long int bytesReceived {recv(sockfdItr, buffer, maxBufferSize, 0)};
-					if(bytesReceived <= -1)
-					{
-						std::cerr << "Error: receiving data! Socket #" << sockfdItr << std::endl;
-					}
-					else if(bytesReceived == 0)
-					{
-						std::cout << "Client disconnected. Socket #" << sockfdItr << std::endl;
-						sendMsg(sockfdItr, "Disconnecting from server.");
-						removeSocket(sockfdItr);
-					}
-					else
-					{
-						std::string receivedData {buffer};
-						std::cout << "CLIENT #" << sockfdItr << "> " << receivedData << std::endl;
-
-						if(receivedData.find("/sendfile") == 0)
-						{
-							std::cout << "Transfering file." << std::endl;
-
-							std::string fileName {receivedData.begin() + receivedData.find_first_not_of("/sendfile "), receivedData.end()};
-							std::cout << "Filename: " << fileName << std::endl;
-
-							sendAll(sockfdItr, "/receivefile " + fileName);
-							receiveFile(sockfdItr, fileName);
-						}
-						else
-							sendAll(sockfdItr, receivedData);
-					}
-				}
-			}
+			if(sockfdItr != m_listeningSockfd && sockfdItr != exceptSockfd)
+				sendMsg(sockfdItr, msg);
 		}
 	}
 }

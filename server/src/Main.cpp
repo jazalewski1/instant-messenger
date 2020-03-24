@@ -1,4 +1,4 @@
-#include <Listener.hpp>
+#include <Server.hpp>
 #include <memory>
 #include <string>
 
@@ -11,22 +11,13 @@ int main(int argc, char* argv[])
 		return -1;
 	}
 
-	Listener server {std::stoi(argv[1])};
-	std::string input;
+	Server server {std::stoi(argv[1])};
 
-	server.startRunning();
-
-	std::cout << "\n(type \"/close\" to disconnect)\n\n";
-
-	while(true)
+	int serverStartResult {server.start()};
+	if(serverStartResult <= -1)
 	{
-		std::getline(std::cin, input);
-		if(input == "/close")
-		{
-			break;
-		}
+		std::cerr << "Error: can't start the server!" << std::endl;
 	}
-
 
 	return 0;
 }

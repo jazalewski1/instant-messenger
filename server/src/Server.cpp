@@ -2,7 +2,7 @@
 #include <algorithm>
 #include <iostream>
 #include <string>
-
+#include <string.h>
 
 Server::Server(int portNumber) :
 	Listener{portNumber},
@@ -47,12 +47,11 @@ int Server::start()
 	std::string input;
 	std::cout << "\n(type \"/close\" to disconnect)\n\n";
 	
-	std::cout << "waiting for input" << std::endl;
 	while(true)
 	{
 		std::getline(std::cin, input);
 		if(input == "/close")
-			break;
+			return 0;
 	}
 }
 
@@ -84,7 +83,6 @@ void Server::receiveHandler(const char* receiveBuffer, long int receivedBytes, i
 	else if(receivedBytes == 0)
 	{
 		std::cout << "Client disconnected. Socket #" << senderSockfd << std::endl;
-		sendMsg(senderSockfd, "Disconnecting from server.");
 		removeSocket(senderSockfd);
 	}
 	else
@@ -100,7 +98,17 @@ void Server::receiveHandler(const char* receiveBuffer, long int receivedBytes, i
 			std::cout << "Filename: \"" << fileName << "\"" << std::endl;
 
 			sendAllExcept(senderSockfd, "/receivefile " + fileName);
-			receiveFile(senderSockfd, fileName);
+			std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+			int acceptFileResult {waitForAcceptFile()};
+			if(acceptFileResult <= -1)
+			{
+				std::cout << "File not accepted." << std::endl;
+			}
+			else
+			{
+				receiveFile(senderSockfd, fileName);
+			}
 		}
 		else
 		{
@@ -111,13 +119,43 @@ void Server::receiveHandler(const char* receiveBuffer, long int receivedBytes, i
 
 void Server::receiveFile(int sourceSockfd, const std::string& fileName)
 {
-	std::cout << "Server::receiveFile()" << std::endl;
-	std::cout << "from socket = " << sourceSockfd << std::endl;
-	std::cout << "filename = \"" << fileName << "\"" << std::endl;
+	unsigned int maxBufferSize {1024};
+	char buffer [maxBufferSize];
 
-	for(int i {0}; i < 32; ++i)
+	std::cout << "Starting to receive a file." << std::endl;
+	while(true)
 	{
-		sendAllExcept(sourceSockfd, "THATSAFILE" + std::to_string(i));
-		std::this_thread::sleep_for(std::chrono::milliseconds(50));
+		memset(buffer, 0, maxBufferSize);
+		long int bytesReceived {recv(sourceSockfd, buffer, maxBufferSize, 0)};
+		if(bytesReceived <= -1)
+		{
+			std::cerr << "Error: receiving file!" << std::endl;
+			break;
+		}
+		else if(bytesReceived == 0)
+		{
+			std::cout << "Client disconnected." << std::endl;
+			removeSocket(sourceSockfd);
+			break;
+		}
+		else
+		{
+			std::string data {buffer};
+			if(data == "/endfile")
+			{
+				sendAllExcept(sourceSockfd, data);
+				break;
+			}
+
+			sendAllExcept(sourceSockfd, buffer);
+		}
 	}
+	std::cout << "Finished sending file.\n";
+
+	std::this_thread::sleep_for(std::chrono::milliseconds(50));
+}
+
+int Server::waitForAcceptFile()
+{
+	return 0;
 }

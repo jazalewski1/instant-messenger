@@ -15,7 +15,11 @@ int main(int argc, char* argv[])
 
 	Client client {location, portNumber};
 
-	client.run();
+	int clientStartResult {client.start()};
+	if(clientStartResult <= -1)
+	{
+		std::cerr << "Error: can't start the client!" << std::endl;
+	}
 
 	return 0;
 }

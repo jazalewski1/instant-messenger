@@ -137,8 +137,8 @@ int Listener::poll()
 			{
 				memset(buffer, 0, maxBufferSize);
 				
-				long int bytesReceived {recv(sockfdItr, buffer, maxBufferSize, 0)};
-				receiveHandler(buffer, bytesReceived, sockfdItr);
+				long int receivedBytes {recv(sockfdItr, buffer, maxBufferSize, 0)};
+				receiveHandler(buffer, receivedBytes, sockfdItr);
 			}
 		}
 	}
@@ -148,7 +148,8 @@ int Listener::poll()
 
 long int Listener::sendMsg(int receiverSockfd, const std::string& msg)
 {
-	return send(receiverSockfd, msg.c_str(), msg.size(), 0);
+	long int sentBytes {send(receiverSockfd, msg.c_str(), msg.size(), 0)};
+	return sentBytes;
 }
 
 long int Listener::sendAll(const std::string& msg)

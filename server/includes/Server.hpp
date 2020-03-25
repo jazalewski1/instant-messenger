@@ -18,6 +18,8 @@ private:
 
 	void receiveFile(int sourceSockfd, const std::string& fileName);
 
+	int waitForAcceptFile();
+
 public:
 	Server(int portNumber);
 

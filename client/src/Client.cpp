@@ -14,7 +14,9 @@
 
 Client::Client(const std::string& ipAddress, int portNumber) :
 	Host{ipAddress, portNumber},
-	m_isReceiveThreadRunning{false}
+	m_isReceiveThreadRunning{false},
+	m_receiveThreadWantsInput{false},
+	m_receiveInput{}
 {
 }
 
@@ -49,12 +51,18 @@ int Client::start()
 
 	std::string input;
 	std::cout << "\n(type \"/close\" to disconnect)" << std::endl;
-	std::cout << "(type \"/sendfile <fileName>\" to send a file)" << std::endl;
+	std::cout << "(type \"/sendfile <aboluteFilePath>\" to send a file)" << std::endl;
 
 	while(true)
 	{
 		std::cout << "YOU> ";
-		getline(std::cin, input);
+		std::getline(std::cin, input);
+		if(m_receiveThreadWantsInput)
+		{
+			m_receiveInput = input;
+			m_receiveThreadWantsInput = false;
+			continue;
+		}
 
 		if(!input.empty())
 		{
@@ -68,27 +76,33 @@ int Client::start()
 				std::string command {input.begin(), whiteItr};
 
 
-				if(command == "/close")
+				if(command.find("/close") == 0)
 				{
 					m_isReceiveThreadRunning = false;
 					return 0;
 				}
-				else if(command == "/sendfile")
+				else if(command.find("/sendfile") == 0)
 				{
-					sendMsg(input);
-					std::this_thread::sleep_for(std::chrono::milliseconds(50));
-
-					std::string fileName {whiteItr + 1, input.end()};
-					sendFile(fileName);
-
-					sendMsg("/endfile");
+					if(whiteItr == input.end())
+					{
+						std::cerr << "Usage: /sendfile <aboluteFilePath>" << std::endl;
+					}
+					else
+					{
+						std::string filePath {whiteItr + 1, input.end()};
+						int sendFileResult {sendFile(filePath)};
+						if(sendFileResult <= -1)
+						{
+							std::cout << "File not sent." << std::endl;
+						}
+					}
 				}
 				else
 					std::cerr << "Unknown command: " << command << std::endl;
 			}
 			else
 			{
-				long int sentBytes {sendMsg(input)};
+				long int sentBytes {sendData(input)};
 				if(sentBytes == -1)
 				{
 					std::cerr << "Error: can't send data!" << std::endl;
@@ -104,6 +118,37 @@ int Client::start()
 	}
 }
 
+int Client::waitForAcceptFile()
+{
+	unsigned int bufferSize {4096};
+	char buffer [bufferSize];
+	memset(&buffer, 0, bufferSize);
+
+	std::cout << "Waiting for accepting the file..." << std::endl;
+	long int receivedBytes {receiveBlocking(buffer, bufferSize)};
+	if(receivedBytes <= -1)
+	{
+		std::cerr << "Error: can't receive data!" << std::endl;
+		m_isReceiveThreadRunning = false;
+		return -1;
+	}
+	else if(receivedBytes == 0)
+	{
+		std::cerr << "Server shut down." << std::endl;
+		m_isReceiveThreadRunning = false;
+		return -1;
+	}
+	else if(receivedBytes > 0)
+	{
+		std::string data {buffer};
+		if(data.find("/acceptfile") == 0)
+			return 0;
+		else if(data.find("/rejectfile") == 0)
+			return -1;
+	}
+	return -1;
+}
+
 void Client::startReceiving()
 {
 	m_isReceiveThreadRunning = true;
@@ -112,7 +157,7 @@ void Client::startReceiving()
 		unsigned int bufferSize {4096};
 		char buffer [bufferSize];
 
-		long int receivedBytes {receive(buffer, static_cast<int>(bufferSize))};
+		long int receivedBytes {receiveNonblocking(buffer, static_cast<int>(bufferSize))};
 		if(receivedBytes == -1)
 		{
 			std::cerr << "Error: can't receive data!" << std::endl;
@@ -136,105 +181,147 @@ void Client::receiveHandler(const char* buffer, long int receivedBytes)
 {
 	std::string receivedData {buffer, 0, static_cast<long unsigned int>(receivedBytes)};
 
-	if(receivedData[0] == '/')
+	if(receivedData.find("/receivefile") == 0)
 	{
-		std::cout << "Attempting to receive a file." << std::endl;
 		std::string fileName {receivedData.begin() + receivedData.find_first_not_of("/receivefile "), receivedData.end()};
-		std::cout << "Filename: \"" << fileName << "\"" << std::endl;
 		
-		receiveFile(fileName);
+		int receiveFileResult {receiveFile(fileName)};
+		if(receiveFileResult <= -1)
+		{
+			std::cerr << "Error: file not received." << std::endl;
+		}
 	}
 	else
 	{
-		std::cout << "CHAT> " << receivedData << "" << std::endl;
+		std::cout << "CHAT> " << receivedData << std::endl;
 	}
 }
 
-void Client::receiveFile(const std::string& fileName)
+int Client::receiveFile(const std::string& fileName)
 {
+	std::cout << "Incoming file. Filename: \"" << fileName << "\"" << std::endl;
+	std::cout << "Do you accept? [Y / N]" << std::endl;
+	m_receiveThreadWantsInput = true;
+	while(m_receiveThreadWantsInput)
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-	std::cout << "Opening a new file." << std::endl;
+	std::string input = m_receiveInput;
+	m_receiveInput.clear();
+
+	if(input.find("Y") != 0)
+	{
+		std::cout << "File not accepted." << std::endl;
+		m_receiveThreadWantsInput = false;
+		sendData("/rejectfile");
+		return -1;
+	}
+
+	std::cout << "Enter absolute path to save file: " << std::endl;
+	m_receiveThreadWantsInput = true;
+	while(m_receiveThreadWantsInput)
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+	std::string filePath;
+	filePath = m_receiveInput;
+	m_receiveInput.clear();
+
+	filePath.append(fileName);
+
 	std::ofstream outFile;
-	outFile.open("result/" + fileName);
+	outFile.open(filePath);
 
 	if(!outFile.is_open())
 	{
-		std::cerr << "Error: can't create file!" << std::endl;
-		sendMsg("/noaccept");
+		std::cerr << "Error: can't save file!" << std::endl;
+		sendData("/rejectfile");
+		return -1;
 	}
-	else
-	{		
-		std::cout << "Starting to receive data." << std::endl;
-		unsigned int bufferSize {4096};
-		char buffer [bufferSize];
-		long int totalReceivedBytes {0};
 
-		while(true)
+	sendData("/acceptfile");
+	std::cout << "Starting to receive data." << std::endl;
+	unsigned int bufferSize {4096};
+	char buffer [bufferSize];
+	long int totalReceivedBytes {0};
+
+	while(true)
+	{
+		memset(buffer, 0, bufferSize);
+
+		long int receivedBytes {receiveNonblocking(buffer, bufferSize)};
+		if(receivedBytes == -1)
 		{
-			memset(buffer, 0, bufferSize);
-
-			long int receivedBytes {receive(buffer, bufferSize)};
-			std::cout << "received bytes = " << receivedBytes << std::endl;
-			std::cout << "buffer = " << buffer << std::endl;
-			if(receivedBytes == -1)
-			{
-				std::cerr << "Error: can't receive the file!" << std::endl;
-				m_isReceiveThreadRunning = false;
-				break;
-			}
-			else if(receivedBytes == 0)
-			{
-				std::cerr << "Server shut down." << std::endl;
-				m_isReceiveThreadRunning = false;
-				break;
-			}
-			else if(receivedBytes > 0)
-			{
-				std::string str {buffer};
-				if(str == "/endfile")
-					break;
-
-				outFile << buffer << std::endl;
-				totalReceivedBytes += receivedBytes;
-			}
+			std::cerr << "Error: can't receive the file!" << std::endl;
+			m_isReceiveThreadRunning = false;
+			return -1;
 		}
-		std::cout << "Total received bytes: " << totalReceivedBytes << std::endl;
-		outFile.close();
+		else if(receivedBytes == 0)
+		{
+			std::cerr << "Server shut down." << std::endl;
+			m_isReceiveThreadRunning = false;
+			return -1;
+		}
+		else if(receivedBytes > 0)
+		{
+			std::string str {buffer};
+			if(str.find("/endfile") == 0)
+				break;
+
+			outFile << buffer << std::endl;
+			totalReceivedBytes += receivedBytes;
+		}
 	}
+	std::cout << "Total received bytes: " << totalReceivedBytes << std::endl;
+	outFile.close();
+	std::cout << "File created in:" << std::endl;
+	std::cout << filePath << std::endl;
+	return 0;
 }
 
-void Client::sendFile(const std::string& fileName)
+int Client::sendFile(const std::string& filePath)
 {
-	std::cout << "Opening file." << std::endl;
 	std::ifstream inFile;
-	inFile.open(fileName);
+	inFile.open(filePath);
+
+	std::string fileName {filePath.begin() + filePath.find_last_of('/') + 1, filePath.end()};
+	std::cout << "sendFile()" << std::endl;
+	std::cout << "filePath = \"" << filePath << "\"" << std::endl;
+	std::cout << "fileName = \"" << fileName << "\"" << std::endl;
+	// std::string filePath2 {getcwd()}
 
 	if(!inFile.is_open())
 	{
-		std::cerr << "Error: can't open file: " << fileName << "!" << std::endl;
+		std::cerr << "Error: can't open file: \"" << fileName << "\"!" << std::endl;
+		return -1;
 	}
-	else
+
+	sendData("/sendfile " + fileName);
+	if(waitForAcceptFile() <= -1)
 	{
-		std::cout << "Start reading from file." << std::endl;
-		std::vector<char> buffer (1024, 0);
+		std::cerr << "Error: file not accepted." << std::endl;
+		return -1;
+	}
 
-		inFile.read(buffer.data(), buffer.size());
-		std::streamsize s = inFile.gcount();
+	std::cout << "Starting to read from file." << std::endl;
+	std::vector<char> buffer (1024, 0);
 
-		while(s > 0)
+	inFile.read(buffer.data(), buffer.size());
+	std::streamsize s = inFile.gcount();
+
+	while(s > 0)
+	{
+		long int sentBytes {sendData(buffer.data())};
+		if(sentBytes <= -1)
 		{
-			long int sentBytes {send(m_sockfd, buffer.data(), 1024, 0)};
-			if(sentBytes <= -1)
-			{
-				std::cerr << "Error: can't send data!" << std::endl;
-			}
-
-			inFile.read(buffer.data(), buffer.size());
-			s = inFile.gcount();
+			std::cerr << "Error: can't send data!" << std::endl;
+			return -1;
 		}
 
-		std::cout << "Finished reading file." << std::endl;
-		std::this_thread::sleep_for(std::chrono::milliseconds(50));
-		sendMsg("/endfile");
+		inFile.read(buffer.data(), buffer.size());
+		s = inFile.gcount();
 	}
+	std::this_thread::sleep_for(std::chrono::milliseconds(50));
+	std::cout << "Finished reading file." << std::endl;
+	sendData("/endfile");
+
+	return 0;
 }

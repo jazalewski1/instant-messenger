@@ -16,11 +16,13 @@ protected:
 
 	int conn();
 
-	long int receive(void* buffer, int bufferSize);
+	long int receiveNonblocking(void* buffer, int bufferSize);
+
+	long int receiveBlocking(void* buffer, int bufferSize);
 
 	virtual void receiveHandler(const char* buffer, long int receivedBytes) = 0;
 
-	long int sendMsg(const std::string& msg);
+	long int sendData(const std::string& data);
 
 public:
 	Host(const std::string& ipAddress, int portNumber);

@@ -38,28 +38,37 @@ int Host::conn()
 	return connect(m_sockfd, (sockaddr*)&m_hint, sizeof(m_hint));
 }
 
-long int Host::receive(void* buffer, int bufferSize)
+long int Host::receiveNonblocking(void* buffer, int bufferSize)
 {
-	memset(buffer, 0, bufferSize);
-
+	// Poll socket with timeout
 	pollfd pfd;
 	pfd.fd = m_sockfd;
 	pfd.events = POLLIN;
 	int pollResult {poll(&pfd, 1, 100)};
 	if(pollResult == -1)
 	{
+		// Error
 		return -1;
 	}
 	else if(pollResult == 0)
 	{
+		// Timeout
 		return -2;
 	}
+
+	memset(buffer, 0, bufferSize);
 	return recv(m_sockfd, buffer, bufferSize, 0);
 }
 
-long int Host::sendMsg(const std::string& msg)
+long int Host::receiveBlocking(void* buffer, int bufferSize)
 {
-	return send(m_sockfd, msg.c_str(), static_cast<int>(msg.length()), 0);
+	memset(buffer, 0, bufferSize);
+	return recv(m_sockfd, buffer, bufferSize, 0);
+}
+
+long int Host::sendData(const std::string& data)
+{
+	return send(m_sockfd, data.c_str(), static_cast<int>(data.length()), 0);
 }
 
 

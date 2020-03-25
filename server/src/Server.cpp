@@ -92,21 +92,24 @@ void Server::receiveHandler(const char* receiveBuffer, long int receivedBytes, i
 
 		if(receivedData.find("/sendfile") == 0)
 		{
-			std::cout << "Transfering file." << std::endl;
-
 			std::string fileName {receivedData.begin() + receivedData.find_first_not_of("/sendfile "), receivedData.end()};
 			std::cout << "Filename: \"" << fileName << "\"" << std::endl;
 
 			sendAllExcept(senderSockfd, "/receivefile " + fileName);
 			std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
-			int acceptFileResult {waitForAcceptFile()};
-			if(acceptFileResult <= -1)
+			if(waitForAcceptFile(senderSockfd) <= -1)
 			{
 				std::cout << "File not accepted." << std::endl;
+				sendMsg(senderSockfd, "/rejectfile");
 			}
 			else
 			{
+				std::cout << "File accepted." << std::endl;
+				sendMsg(senderSockfd, "/acceptfile");
+
+				std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
 				receiveFile(senderSockfd, fileName);
 			}
 		}
@@ -117,12 +120,37 @@ void Server::receiveHandler(const char* receiveBuffer, long int receivedBytes, i
 	}
 }
 
+int Server::waitForAcceptFile(int senderSockfd)
+{
+	for(int sockfdItr {0}; sockfdItr <= m_sockfdCount; ++sockfdItr) // Temporary solution to wait for /acceptfile
+	{
+		if(FD_ISSET(sockfdItr, &m_master))
+		{
+			if(sockfdItr != m_listeningSockfd && sockfdItr != senderSockfd)
+			{
+				unsigned int maxBufferSize {1024};
+				char buffer [maxBufferSize];
+
+				memset(buffer, 0, maxBufferSize);
+				long int bytesReceived {recv(sockfdItr, buffer, maxBufferSize, 0)};
+
+				std::string data {buffer};
+				if(data.find("/acceptfile") == 0)
+					return 0;
+				else if(data.find("/rejectfile") == 0)
+					return -1;
+			}
+		}
+	}
+	return -1;
+}
+
 void Server::receiveFile(int sourceSockfd, const std::string& fileName)
 {
 	unsigned int maxBufferSize {1024};
 	char buffer [maxBufferSize];
 
-	std::cout << "Starting to receive a file." << std::endl;
+	std::cout << "Starting to receive and send a file." << std::endl;
 	while(true)
 	{
 		memset(buffer, 0, maxBufferSize);
@@ -141,7 +169,7 @@ void Server::receiveFile(int sourceSockfd, const std::string& fileName)
 		else
 		{
 			std::string data {buffer};
-			if(data == "/endfile")
+			if(data.find("/endfile") == 0)
 			{
 				sendAllExcept(sourceSockfd, data);
 				break;
@@ -151,11 +179,4 @@ void Server::receiveFile(int sourceSockfd, const std::string& fileName)
 		}
 	}
 	std::cout << "Finished sending file.\n";
-
-	std::this_thread::sleep_for(std::chrono::milliseconds(50));
-}
-
-int Server::waitForAcceptFile()
-{
-	return 0;
 }

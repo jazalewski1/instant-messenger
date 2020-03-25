@@ -18,7 +18,7 @@ private:
 
 	void receiveFile(int sourceSockfd, const std::string& fileName);
 
-	int waitForAcceptFile();
+	int waitForAcceptFile(int senderSockfd);
 
 public:
 	Server(int portNumber);

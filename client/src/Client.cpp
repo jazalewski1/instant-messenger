@@ -51,7 +51,7 @@ int Client::start()
 
 	std::string input;
 	std::cout << "\n(type \"/close\" to disconnect)" << std::endl;
-	std::cout << "(type \"/sendfile <aboluteFilePath>\" to send a file)" << std::endl;
+	std::cout << "(type \"/sendfile <absolutePathToFile>\" to send a file)" << std::endl;
 
 	while(true)
 	{
@@ -85,7 +85,7 @@ int Client::start()
 				{
 					if(whiteItr == input.end())
 					{
-						std::cerr << "Usage: /sendfile <aboluteFilePath>" << std::endl;
+						std::cerr << "Usage: \"/sendfile <absolutePathToFile>\"" << std::endl;
 					}
 					else
 					{
@@ -232,7 +232,8 @@ int Client::receiveFile(const std::string& fileName)
 
 	if(!outFile.is_open())
 	{
-		std::cerr << "Error: can't save file!" << std::endl;
+		std::cerr << "Error: can't save file! File:" << std::endl;
+		std::cout << filePath << std::endl;
 		sendData("/rejectfile");
 		return -1;
 	}
@@ -283,10 +284,6 @@ int Client::sendFile(const std::string& filePath)
 	inFile.open(filePath);
 
 	std::string fileName {filePath.begin() + filePath.find_last_of('/') + 1, filePath.end()};
-	std::cout << "sendFile()" << std::endl;
-	std::cout << "filePath = \"" << filePath << "\"" << std::endl;
-	std::cout << "fileName = \"" << fileName << "\"" << std::endl;
-	// std::string filePath2 {getcwd()}
 
 	if(!inFile.is_open())
 	{

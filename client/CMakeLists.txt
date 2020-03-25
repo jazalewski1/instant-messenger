@@ -2,20 +2,21 @@ cmake_minimum_required(VERSION 3.10)
 
 project(Messenger LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 14)
 
 set(SOURCES 
-	src/Main.cpp
-	src/Client.cpp
-	src/Host.cpp
+src/Main.cpp
+src/Client.cpp
+src/Host.cpp
 )
 
 set(INCLUDES
-	includes/Client.hpp
-	includes/Host.hpp
+includes/Client.hpp
+includes/Host.hpp
 )
 
 add_executable(Client ${SOURCES} ${INCLUDES})
+
+set_target_properties(Client PROPERTIES CMAKE_CXX_STANDARD 14)
 
 find_package(Threads)
 target_link_libraries(Client ${CMAKE_THREAD_LIBS_INIT})

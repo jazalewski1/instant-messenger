@@ -93,7 +93,7 @@ void Server::receiveHandler(const char* receiveBuffer, long int receivedBytes, i
 		if(receivedData.find("/sendfile") == 0)
 		{
 			std::string fileName {receivedData.begin() + receivedData.find_first_not_of("/sendfile "), receivedData.end()};
-			std::cout << "Filename: \"" << fileName << "\"" << std::endl;
+			std::cout << "Request to send file: \"" << fileName << "\"" << std::endl;
 
 			sendAllExcept(senderSockfd, "/receivefile " + fileName);
 			std::this_thread::sleep_for(std::chrono::milliseconds(50));

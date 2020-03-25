@@ -10,3 +10,4 @@ build
 # Transfer testing files
 image.jpg
 hello.txt
+result/*

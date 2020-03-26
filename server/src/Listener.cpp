@@ -8,8 +8,7 @@
 #include <netdb.h>
 #include <unistd.h>
 
-Listener::Listener(int portNumber) :
-	m_port{std::to_string(portNumber)}, 
+Listener::Listener() :
 	m_listeningSockfd{-1}, m_sockfdCount{0}
 {
 }
@@ -29,17 +28,18 @@ Listener::~Listener()
 		removeSocket(m_listeningSockfd);
 }
 
-// RETURNS: 0 on success, -1 on getaddrinfo() error, -2 on binding error
-int Listener::createListeningSocket()
+// RETURNS: 0 on success; -1 on getaddrinfo() error; -2 on binding error
+int Listener::createListeningSocket(const std::string& portNumber)
 {
-	memset(&m_hint, 0, sizeof(m_hint));
+	addrinfo hints;
+	memset(&hints, 0, sizeof(hints));
 
-	m_hint.ai_family = AF_INET;
-	m_hint.ai_socktype = SOCK_STREAM;
-	m_hint.ai_flags = AI_PASSIVE;
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = AI_PASSIVE;
 
 	addrinfo* listBegin;
-	int addrInfoResult {getaddrinfo(nullptr, m_port.c_str(), &m_hint, &listBegin)};
+	int addrInfoResult {getaddrinfo(nullptr, portNumber.c_str(), &hints, &listBegin)};
 	if(addrInfoResult != 0)
 		return -1;
 
@@ -65,10 +65,13 @@ int Listener::createListeningSocket()
 
 	freeaddrinfo(listBegin);
 
+	std::cout << "Listening socket #" << m_listeningSockfd << std::endl;
+
 	displayInfo("Server", (sockaddr_in*)listResult->ai_addr);
 	return 0;
 }
 
+// RETURNS: 0 on success; -1 on listen() error
 int Listener::startListening()
 {
 	int listeningResult {listen(m_listeningSockfd, 2)};
@@ -83,6 +86,7 @@ int Listener::startListening()
 	return 0;
 }
 
+// RETURNS: new host's sockfd on connection; -1 on accept() error
 int Listener::acceptHost()
 {
 	sockaddr_storage remoteAddr;
@@ -95,27 +99,31 @@ int Listener::acceptHost()
 	FD_SET(newSockfd, &m_master);
 	displayInfo("Client", (sockaddr_in*)&remoteAddr);
 
+	if(newSockfd > m_sockfdCount)
+		m_sockfdCount = newSockfd;
+
 	return newSockfd;
 }
 
-void Listener::removeSocket(int sockfd)
+// RETURNS: 0 on success, -1 on close() error
+int Listener::removeSocket(int sockfd)
 {
 	FD_CLR(sockfd, &m_master);
-	close(sockfd);
+	return close(sockfd);
 }
 
-// RETURNS: 0 on success, -1 on select() error, -2 on acceptHost() error
+// RETURNS: 0 on connection request; sender's sockfd on success; -1 on select() error; -2 on timeout
 int Listener::poll()
 {
-	unsigned int maxBufferSize {4096};
-	char buffer [maxBufferSize];
-
 	fd_set copySet {m_master};
 
 	timeval timeout;
 	timeout.tv_usec = 1000;
-	int socketCount {select(m_sockfdCount + 1, &copySet, nullptr, nullptr, &timeout)};
-	if(socketCount == -1)
+	timeout.tv_sec = 0;
+	int selectResult {select(m_sockfdCount + 1, &copySet, nullptr, nullptr, &timeout)};
+	if(selectResult == 0)
+		return -2;
+	if(selectResult == -1)
 		return -1;
 
 	for(int sockfdItr {0}; sockfdItr <= m_sockfdCount; ++sockfdItr)
@@ -123,27 +131,19 @@ int Listener::poll()
 		if(FD_ISSET(sockfdItr, &copySet))
 		{
 			if(sockfdItr == m_listeningSockfd)
-			{
-				int newSockfd {acceptHost()};
-				if(newSockfd <= -1)
-					return -2;
-
-				if(newSockfd > m_sockfdCount)
-					m_sockfdCount = newSockfd;
-
-				std::cout << "Connected new client. Socket #" << newSockfd << std::endl;
-			}
+				return 0; // It's a connection request
 			else
-			{
-				memset(buffer, 0, maxBufferSize);
-				
-				long int receivedBytes {recv(sockfdItr, buffer, maxBufferSize, 0)};
-				receiveHandler(buffer, receivedBytes, sockfdItr);
-			}
+				return sockfdItr; // It's a sending data request
 		}
 	}
+	return -2;
+}
 
-	return 0;
+long int Listener::receive(int sockfd, char* buffer, unsigned int bufferSize)
+{
+	memset(buffer, 0, bufferSize);
+
+	return recv(sockfd, buffer, bufferSize, 0);
 }
 
 long int Listener::sendData(int receiverSockfd, const std::string& data)

@@ -5,25 +5,28 @@
 #include <string>
 #include <thread>
 
-class Server : public Listener
+class Server
 {
 private:
+	Listener* m_listener;
 	std::thread m_pollThread;
 	bool m_isPollThreadRunning;
 
 private:
 	void startPolling();
 
-	void receiveHandler(const char* receiveBuffer, long int receivedBytes, int senderSockfd) override;
+	void receive(int senderSockfd, const std::string& receivedData);
 
-	void receiveFile(int sourceSockfd, const std::string& fileName);
+	void transferFile(int sourceSockfd, const std::string& fileName);
 
 	int waitForAcceptFile(int senderSockfd);
 
 public:
-	Server(int portNumber);
+	Server(Listener* listener);
 
-	~Server() override;
+	~Server();
+
+	int connect(const std::string& portNumber);
 
 	int start();
 };

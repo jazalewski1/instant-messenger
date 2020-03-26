@@ -11,12 +11,20 @@ int main(int argc, char* argv[])
 		return -1;
 	}
 
-	Server server {std::stoi(argv[1])};
+	Listener listener {};
 
-	int serverStartResult {server.start()};
-	if(serverStartResult <= -1)
+	Server server {&listener};
+
+	if(server.connect(argv[1]) <= -1)
 	{
-		std::cerr << "Error: can't start the server!" << std::endl;
+		std::cerr << "Error: can't connect the server!" << std::endl;
+		return -1;
+	}
+
+	if(server.start() <= -1)
+	{
+		std::cerr << "Error: running server!" << std::endl;
+		return -2;
 	}
 
 	return 0;

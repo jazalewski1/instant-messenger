@@ -146,34 +146,35 @@ int Listener::poll()
 	return 0;
 }
 
-long int Listener::sendMsg(int receiverSockfd, const std::string& msg)
+long int Listener::sendData(int receiverSockfd, const std::string& data)
 {
-	long int sentBytes {send(receiverSockfd, msg.c_str(), msg.size(), 0)};
-	return sentBytes;
+	return send(receiverSockfd, data.c_str(), data.size(), 0);
 }
 
-long int Listener::sendAll(const std::string& msg)
+long int Listener::sendAll(const std::string& data)
 {
 	for(int sockfdItr {0}; sockfdItr <= m_sockfdCount; ++sockfdItr)
 	{
 		if(FD_ISSET(sockfdItr, &m_master))
 		{
 			if(sockfdItr != m_listeningSockfd)
-				sendMsg(sockfdItr, msg);
+				return sendData(sockfdItr, data);
 		}
 	}
+	return -1;
 }
 
-long int Listener::sendAllExcept(int exceptSockfd, const std::string& msg)
+long int Listener::sendAllExcept(int exceptSockfd, const std::string& data)
 {
 	for(int sockfdItr {0}; sockfdItr <= m_sockfdCount; ++sockfdItr)
 	{
 		if(FD_ISSET(sockfdItr, &m_master))
 		{
 			if(sockfdItr != m_listeningSockfd && sockfdItr != exceptSockfd)
-				sendMsg(sockfdItr, msg);
+				return sendData(sockfdItr, data);
 		}
 	}
+	return -1;
 }
 
 void Listener::displayInfo(const std::string& name, sockaddr_in* saddrPtr)

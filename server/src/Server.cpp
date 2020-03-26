@@ -101,12 +101,12 @@ void Server::receiveHandler(const char* receiveBuffer, long int receivedBytes, i
 			if(waitForAcceptFile(senderSockfd) <= -1)
 			{
 				std::cout << "File not accepted." << std::endl;
-				sendMsg(senderSockfd, "/rejectfile");
+				sendData(senderSockfd, "/rejectfile");
 			}
 			else
 			{
 				std::cout << "File accepted." << std::endl;
-				sendMsg(senderSockfd, "/acceptfile");
+				sendData(senderSockfd, "/acceptfile");
 
 				std::this_thread::sleep_for(std::chrono::milliseconds(50));
 

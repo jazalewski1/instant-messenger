@@ -26,11 +26,11 @@ protected:
 
 	virtual void receiveHandler(const char* receiveBuffer, long int receivedBytes, int senderSockfd) = 0;
 
-	long int sendMsg(int receiverSockfd, const std::string& msg);
+	long int sendData(int receiverSockfd, const std::string& data);
 
-	long int sendAll(const std::string& msg);
+	long int sendAll(const std::string& data);
 
-	long int sendAllExcept(int exceptSockfd, const std::string& msg);
+	long int sendAllExcept(int exceptSockfd, const std::string& data);
 
 public:
 	Listener(int portNumber);

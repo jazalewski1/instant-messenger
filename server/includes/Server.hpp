@@ -8,7 +8,7 @@
 class Server
 {
 private:
-	Listener* m_listener;
+	IListener* m_listener;
 	std::thread m_pollThread;
 	bool m_isPollThreadRunning;
 
@@ -22,7 +22,7 @@ private:
 	int waitForAcceptFile(int senderSockfd);
 
 public:
-	Server(Listener* listener);
+	Server(IListener* listener);
 
 	~Server();
 

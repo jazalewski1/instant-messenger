@@ -5,7 +5,7 @@
 #include <string>
 #include <string.h>
 
-Server::Server(Listener* listener) :
+Server::Server(IListener* listener) :
 	m_listener{listener},
 	m_isPollThreadRunning{false}
 {

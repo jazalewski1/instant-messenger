@@ -9,6 +9,7 @@ class Client
 {
 private:
 	IHost* m_host;
+	bool m_isInputThreadRunning;
 	bool m_isReceiveThreadRunning;
 	std::thread m_receiveThread;
 	bool m_receiveThreadWantsInput;
@@ -16,10 +17,6 @@ private:
 
 private:
 	void startReceiving();
-
-	int receiveFile(const std::string& fileName);
-
-	int sendFile(const std::string& filePath);
 
 	int waitForAcceptFile();
 
@@ -30,5 +27,15 @@ public:
 
 	int connect(const std::string& ipAddress, int portNumber);
 
-	int start();
+	void start();
+
+	int update(const std::string& input);
+
+	int acceptFile(const std::string& fileName, std::ofstream& outFile);
+
+	long int receiveFile(std::ostream& outFile);
+
+	int requestSendFile(const std::string& filePath, std::ifstream& inFile);
+
+	int sendFile(std::ifstream& inFile);
 };

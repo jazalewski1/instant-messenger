@@ -264,14 +264,14 @@ int Client::requestSendFile(const std::string& filePath, std::ifstream& inFile)
 	if(!inFile.is_open())
 	{
 		std::cerr << "Error: can't open file: \"" << fileName << "\"!" << std::endl;
-		return 1;
+		return -1;
 	}
 
 	m_host->sendData("/sendfile " + fileName);
 	if(waitForAcceptFile() <= -1)
 	{
 		std::cerr << "Error: file not accepted." << std::endl;
-		return 1;
+		return -1;
 	}
 	return 0;
 }

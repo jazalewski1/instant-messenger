@@ -1,6 +1,5 @@
 #include <Client.hpp>
 #include <Host.hpp>
-#include <algorithm>
 #include <chrono>
 #include <arpa/inet.h>
 #include <iostream>
@@ -54,7 +53,7 @@ int Client::start()
 
 	std::string input;
 	std::cout << "\n(type \"/close\" to disconnect)" << std::endl;
-	std::cout << "(type \"/sendfile <absolutePathToFile>\" to send a file)" << std::endl;
+	std::cout << "(type \"/sendfile <absolutePathToFile>\" to send a file)\n" << std::endl;
 
 	while(true)
 	{
@@ -74,18 +73,15 @@ int Client::start()
 		}
 		else if(input.find("/sendfile") == 0)
 		{
-			auto whiteItr {std::find_if(input.begin(), input.end(), [](char c)
-			{
-				return (c == ' ' ||  c == '\n'); 
-			})}; // TODO: could be cleaner
-
-			if(whiteItr == input.end())
+			long unsigned int whiteIndex {input.find_first_not_of("/sendfile")};
+			std::cout << "whitespace = " << whiteIndex << std::endl;
+			if(whiteIndex == std::string::npos || whiteIndex == input.length() - 1)
 			{
 				std::cerr << "Usage: \"/sendfile <absolutePathToFile>\"" << std::endl;
 			}
 			else
 			{
-				std::string filePath {whiteItr + 1, input.end()};
+				std::string filePath {input.begin() + whiteIndex + 1, input.end()};
 				int sendFileResult {sendFile(filePath)};
 				if(sendFileResult <= -1)
 				{

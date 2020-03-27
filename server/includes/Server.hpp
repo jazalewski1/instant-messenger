@@ -15,12 +15,6 @@ private:
 private:
 	void startPolling();
 
-	void receive(int senderSockfd, const std::string& receivedData);
-
-	void transferFile(int sourceSockfd, const std::string& fileName);
-
-	int waitForAcceptFile(int senderSockfd);
-
 public:
 	Server(IListener* listener);
 
@@ -29,4 +23,10 @@ public:
 	int connect(const std::string& portNumber);
 
 	int start();
+
+	void receive(int senderSockfd, const std::string& receivedData);
+
+	void transferFile(int sourceSockfd, const std::string& fileName);
+
+	int waitForAcceptFile(int senderSockfd);
 };

@@ -46,6 +46,7 @@ int Server::connect(const std::string& portNumber)
 
 int Server::start()
 {
+	m_isPollThreadRunning = true;
 	m_pollThread = std::thread{&Server::startPolling, this};
 
 	std::string input;
@@ -62,7 +63,6 @@ int Server::start()
 
 void Server::startPolling()
 {
-	m_isPollThreadRunning = true;
 	while(m_isPollThreadRunning)
 	{
 		int pollResult {m_listener->poll()};
@@ -210,13 +210,10 @@ void Server::transferFile(int sourceSockfd, const std::string& fileName)
 		else
 		{
 			std::string data {buffer};
-			if(data.find("/endfile") == 0)
-			{
-				m_listener->sendAllExcept(sourceSockfd, data);
-				break;
-			}
-
 			m_listener->sendAllExcept(sourceSockfd, data);
+
+			if(data.find("/endfile") == 0)
+				break;
 		}
 	}
 	std::cout << "Finished sending file.\n";

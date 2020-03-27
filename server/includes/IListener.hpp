@@ -5,6 +5,8 @@
 class IListener
 {
 public:
+	virtual ~IListener() {};
+	
 	virtual int createListeningSocket(const std::string& portNumber) = 0;
 
 	virtual int startListening() = 0;

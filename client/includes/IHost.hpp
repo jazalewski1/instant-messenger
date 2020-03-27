@@ -5,6 +5,8 @@
 class IHost
 {
 public:
+	virtual ~IHost() {};
+
 	virtual int createSocket() = 0;
 	
 	virtual int conn(const std::string& ipAddress, int portNumber) = 0;

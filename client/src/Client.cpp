@@ -13,7 +13,7 @@
 #include <unistd.h>
 #include <vector>
 
-Client::Client(Host* host) :
+Client::Client(IHost* host) :
 	m_host{host},
 	m_isReceiveThreadRunning{false},
 	m_receiveThreadWantsInput{false},

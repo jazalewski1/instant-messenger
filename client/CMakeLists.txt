@@ -12,6 +12,7 @@ src/Host.cpp
 set(INCLUDES
 includes/Client.hpp
 includes/Host.hpp
+includes/IHost.hpp
 )
 
 add_executable(Client ${SOURCES} ${INCLUDES})

@@ -8,7 +8,7 @@
 class Client
 {
 private:
-	Host* m_host;
+	IHost* m_host;
 	bool m_isReceiveThreadRunning;
 	std::thread m_receiveThread;
 	bool m_receiveThreadWantsInput;
@@ -24,7 +24,7 @@ private:
 	int waitForAcceptFile();
 
 public:
-	Client(Host* host);
+	Client(IHost* host);
 
 	~Client();
 

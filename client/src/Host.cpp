@@ -9,9 +9,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-Host::Host(const std::string& ipAddress, int portNumber) :
-		m_serverIpAddress{ipAddress}, m_serverPortNumber{portNumber},
-		m_sockfd{-1}
+Host::Host() :
+	m_sockfd{-1}
 {
 }
 
@@ -20,6 +19,7 @@ Host::~Host()
 	close(m_sockfd);
 }
 
+// RETURNS: sockfd on success; -1 on error
 int Host::createSocket()
 {
 	m_sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -27,40 +27,36 @@ int Host::createSocket()
 	return m_sockfd;
 }
 
-int Host::conn()
+// RETURNS: 0 on success; -1 on error
+int Host::conn(const std::string& ipAddress, int portNumber)
 {
-	m_hint.sin_family = AF_INET;
-	m_hint.sin_port = htons(m_serverPortNumber);
-	inet_pton(AF_INET, m_serverIpAddress.c_str(), &m_hint.sin_addr);
+	sockaddr_in hints;
+	hints.sin_family = AF_INET;
+	hints.sin_port = htons(portNumber);
+	inet_pton(AF_INET, ipAddress.c_str(), &hints.sin_addr);
 
-	displayInfo("Server", &m_hint);
+	displayInfo("Server", &hints); // TODO: move elsewhere, best to Client
 
-	return connect(m_sockfd, (sockaddr*)&m_hint, sizeof(m_hint));
+	return connect(m_sockfd, (sockaddr*)&hints, sizeof(hints));
 }
 
-long int Host::receiveNonblocking(void* buffer, int bufferSize)
+// RETURNS: received bytes on success; 0 on disconnection; -1 on error; -2 on timeout
+long int Host::receiveNonblocking(char* buffer, int bufferSize)
 {
-	// Poll socket with timeout
 	pollfd pfd;
 	pfd.fd = m_sockfd;
 	pfd.events = POLLIN;
 	int pollResult {poll(&pfd, 1, 100)};
 	if(pollResult == -1)
-	{
-		// Error
 		return -1;
-	}
 	else if(pollResult == 0)
-	{
-		// Timeout
 		return -2;
-	}
 
 	memset(buffer, 0, bufferSize);
 	return recv(m_sockfd, buffer, bufferSize, 0);
 }
 
-long int Host::receiveBlocking(void* buffer, int bufferSize)
+long int Host::receiveBlocking(char* buffer, int bufferSize)
 {
 	memset(buffer, 0, bufferSize);
 	return recv(m_sockfd, buffer, bufferSize, 0);
@@ -70,7 +66,6 @@ long int Host::sendData(const std::string& data)
 {
 	return send(m_sockfd, data.c_str(), static_cast<int>(data.length()), 0);
 }
-
 
 void Host::displayInfo(const std::string& name, sockaddr_in* saddrPtr)
 {

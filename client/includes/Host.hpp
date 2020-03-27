@@ -5,29 +5,23 @@
 
 class Host
 {
-protected:
-	std::string m_serverIpAddress;
-	int m_serverPortNumber;
+private:
 	int m_sockfd;
-	sockaddr_in m_hint;
-
-protected:
-	int createSocket();
-
-	int conn();
-
-	long int receiveNonblocking(void* buffer, int bufferSize);
-
-	long int receiveBlocking(void* buffer, int bufferSize);
-
-	virtual void receiveHandler(const char* buffer, long int receivedBytes) = 0;
-
-	long int sendData(const std::string& data);
 
 public:
-	Host(const std::string& ipAddress, int portNumber);
+	Host();
 
-	virtual ~Host();
+	~Host();
+
+	int createSocket();
+
+	int conn(const std::string& ipAddress, int portNumber);
+
+	long int receiveNonblocking(char* buffer, int bufferSize);
+
+	long int receiveBlocking(char* buffer, int bufferSize);
+
+	long int sendData(const std::string& data);
 
 	static void displayInfo(const std::string& name, sockaddr_in* saddrPtr);
 };

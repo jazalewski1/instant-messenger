@@ -5,18 +5,17 @@
 #include <string>
 #include <thread>
 
-class Client : public Host
+class Client
 {
 private:
+	Host* m_host;
 	bool m_isReceiveThreadRunning;
 	std::thread m_receiveThread;
 	bool m_receiveThreadWantsInput;
 	std::string m_receiveInput;
 
-protected:
+private:
 	void startReceiving();
-
-	void receiveHandler(const char* buffer, long int receivedBytes) override;
 
 	int receiveFile(const std::string& fileName);
 
@@ -25,9 +24,11 @@ protected:
 	int waitForAcceptFile();
 
 public:
-	Client(const std::string& ipAddress, int portNumber);
+	Client(Host* host);
 
 	~Client();
+
+	int connect(const std::string& ipAddress, int portNumber);
 
 	int start();
 };

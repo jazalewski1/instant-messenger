@@ -10,6 +10,7 @@ src/Server.cpp
 
 set(INCLUDES
 includes/Listener.hpp
+includes/IListener.hpp
 includes/Server.hpp
 )
 

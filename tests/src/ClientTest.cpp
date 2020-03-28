@@ -1,5 +1,4 @@
 #include <Client.hpp>
-#include <Host.hpp>
 #include <MockHost.hpp>
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>

@@ -1,26 +1,26 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(Messenger LANGUAGES CXX)
+find_package(Threads)
 
-set(SOURCES
-src/Main.cpp
-src/Listener.cpp
-src/Server.cpp
-)
+add_executable(Server src/Main.cpp)
 
-set(INCLUDES
+add_library(ServerLib
+includes/Server.hpp
 includes/Listener.hpp
 includes/IListener.hpp
-includes/Server.hpp
+src/Server.cpp
+src/Listener.cpp
 )
 
-add_executable(Server ${SOURCES} ${INCLUDES})
+target_link_libraries(ServerLib
+${CMAKE_THREAD_LIBS_INIT}
+)
 
-set_target_properties(Server PROPERTIES CMAKE_CXX_STANDARD 14)
+target_link_libraries(Server
+ServerLib
+)
 
-find_package(Threads)
-target_link_libraries(Server ${CMAKE_THREAD_LIBS_INIT})
+target_include_directories(Server PRIVATE includes)
+target_include_directories(ServerLib PUBLIC includes)
 
-target_include_directories(Server PUBLIC includes)
-
-set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
+set(EXECUTABLE_OUTPUT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/bin)

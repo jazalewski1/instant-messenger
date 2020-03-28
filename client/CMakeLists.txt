@@ -1,27 +1,26 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(Messenger LANGUAGES CXX)
+find_package(Threads)
 
+add_executable(Client src/Main.cpp)
 
-set(SOURCES 
-src/Main.cpp
+add_library(ClientLib
+includes/Client.hpp
+includes/Host.hpp
+includes/IHost.hpp
 src/Client.cpp
 src/Host.cpp
 )
 
-set(INCLUDES
-includes/Client.hpp
-includes/Host.hpp
-includes/IHost.hpp
+target_link_libraries(ClientLib
+${CMAKE_THREAD_LIBS_INIT}
 )
 
-add_executable(Client ${SOURCES} ${INCLUDES})
+target_link_libraries(Client
+ClientLib
+)
 
-set_target_properties(Client PROPERTIES CMAKE_CXX_STANDARD 14)
+target_include_directories(Client PRIVATE includes)
+target_include_directories(ClientLib PUBLIC includes)
 
-find_package(Threads)
-target_link_libraries(Client ${CMAKE_THREAD_LIBS_INIT})
-
-target_include_directories(Client PUBLIC includes)
-
-set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
+set(EXECUTABLE_OUTPUT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/bin)

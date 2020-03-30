@@ -23,12 +23,11 @@ $ client/bin/Client <ipAddress> <portNumber>
 
 4. To test if the chat is working, start another client the same way.
 
-5. To send a file, in client application enter command:
+5. To run unit tests, after building the project go to `instant-messenger` directory and enter command:
 ```
-/sendfile <absolutePathToFile>
+$ tests/bin/ServerTest
 ```
-
-6. To close client or server application, enter command:
+for server tests, or for client tests:
 ```
-/close
+$ tests/bin/ClientTest
 ```

@@ -24,18 +24,18 @@ int main(int argc, char* argv[])
 
 	std::cout << "Enter \"/close\" to close server.\n";
 
-	bool isClientRunning {true};
+	bool isServerRunning {true};
 	std::thread inputThread {[&](){
 		std::string input;
-		while(isClientRunning)
+		while(isServerRunning)
 		{
 			std::getline(std::cin, input);
 			if(input.find("/close") == 0)
-				isClientRunning = false;
+				isServerRunning = false;
 		}
 	}};
 
-	while(isClientRunning)
+	while(isServerRunning)
 	{
 		int pollResult {server.poll()};
 		if(pollResult == -1)

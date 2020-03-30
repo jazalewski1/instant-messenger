@@ -5,6 +5,7 @@ find_package(Threads)
 add_executable(Server src/Main.cpp)
 
 add_library(ServerLib
+includes/Data.hpp
 includes/Server.hpp
 includes/Listener.hpp
 includes/IListener.hpp

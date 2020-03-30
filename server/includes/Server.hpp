@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Data.hpp>
 #include <Listener.hpp>
 #include <iostream>
 #include <string>
@@ -9,24 +10,25 @@ class Server
 {
 private:
 	IListener* m_listener;
-	std::thread m_pollThread;
-	bool m_isPollThreadRunning;
-
-private:
-	void startPolling();
 
 public:
 	Server(IListener* listener);
 
-	~Server();
-
 	int connect(const std::string& portNumber);
 
-	int start();
+	int addClient();
 
-	void receive(int senderSockfd, const std::string& receivedData);
+	int removeClient(int sockfd);
 
-	void transferFile(int sourceSockfd, const std::string& fileName);
+	int poll();
 
-	int waitForAcceptFile(int senderSockfd);
+	Data receive(int sourceFd);
+
+	int sendTo(int destinationFd, const std::string& data);
+
+	int sendExcept(int exceptFd, const std::string& data);
+
+	int waitForAcceptFile(int sourceFd);
+
+	int transferFile(int sourceFd);
 };

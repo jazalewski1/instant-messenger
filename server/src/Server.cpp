@@ -1,23 +1,13 @@
+#include <Data.hpp>
 #include <Listener.hpp>
 #include <Server.hpp>
-#include <algorithm>
 #include <iostream>
 #include <string>
 #include <string.h>
 
 Server::Server(IListener* listener) :
-	m_listener{listener},
-	m_isPollThreadRunning{false}
+	m_listener{listener}
 {
-}
-
-Server::~Server()
-{
-	m_isPollThreadRunning = false;
-	if(m_pollThread.joinable())
-		m_pollThread.join();
-
-	std::cout << "Closing server." << std::endl;
 }
 
 int Server::connect(const std::string& portNumber)
@@ -25,157 +15,127 @@ int Server::connect(const std::string& portNumber)
 	int createListeningResult {m_listener->createListeningSocket(portNumber)};
 	if(createListeningResult == -1)
 	{
-		std::cerr << "Error: can't get address info!" << std::endl;
+		std::cerr << "Error: can't get address info!\n";
 		return -1;
 	}
 	else if(createListeningResult == -2)
 	{
-		std::cerr << "Error: can't bind listening socket!" << std::endl;
+		std::cerr << "Error: can't bind listening socket!\n";
 		return -1;
 	}
 
 	int listeningResult {m_listener->startListening()};
 	if(listeningResult <= -1)
 	{
-		std::cerr << "Error: can't start listening!" << std::endl;
+		std::cerr << "Error: can't start listening!\n";
 		return -1;
 	}
 
 	return 0;
 }
 
-int Server::start()
+int Server::addClient()
 {
-	m_isPollThreadRunning = true;
-	m_pollThread = std::thread{&Server::startPolling, this};
-
-	std::string input;
-	std::cout << "\n(type \"/close\" to disconnect)\n\n";
-	
-	while(true)
+	int acceptResult {m_listener->acceptHost()};
+	if(acceptResult <= -1)
 	{
-		std::getline(std::cin, input);
-		if(input.find("/close") == 0)
-			break;
+		std::cerr << "Error: can't connect new client! Client #" << acceptResult << "\n";
+		return -1;
+	}
+	std::cout << "New client connected. Client #" << acceptResult << "\n";
+	return 0;
+}
+
+int Server::removeClient(int sockfd)
+{
+	if(m_listener->removeSocket(sockfd) == -1)
+	{
+		std::cerr << "Error: can't remove client! Client # " << sockfd << "\n";
+		return -1;
+	}
+	std::cout << "Removed client # " << sockfd << "\n";
+	return 0;
+}
+
+int Server::poll()
+{
+	int pollResult {m_listener->poll()};
+	if(pollResult == -1)
+	{
+		std::cerr << "Error: can't select socket!\n";
+		return -1;
+	}
+	return pollResult;
+}
+
+Data Server::receive(int sourceFd)
+{
+	unsigned int bufferSize {4096};
+	char buffer [bufferSize];
+
+	memset(buffer, 0, bufferSize);
+
+	long int receivedBytes {m_listener->receive(sourceFd, buffer, bufferSize)};
+	if(receivedBytes == -1)
+	{
+		std::cerr << "Error: can't receive data! From client #" << sourceFd << "\n";
+		return Data{-1, ""};
+	}
+	return Data{receivedBytes, std::string{buffer}};
+}
+
+int Server::sendTo(int destinationFd, const std::string& data)
+{
+	long int bytesSent {m_listener->sendData(destinationFd, data)};
+	if(bytesSent == -1)
+	{
+		std::cerr << "Error: can't send data! To client #" << destinationFd << '\n';
+		return -1;
 	}
 	return 0;
 }
 
-void Server::startPolling()
+int Server::sendExcept(int exceptFd, const std::string& data)
 {
-	while(m_isPollThreadRunning)
+	long int bytesSent {m_listener->sendAllExcept(exceptFd, data)};
+	if(bytesSent == -1)
 	{
-		int pollResult {m_listener->poll()};
-		if(pollResult == -1)
-		{
-			std::cerr << "Error: select socket!" << std::endl;
-			m_isPollThreadRunning = false;
-			break;
-		}
-		else if(pollResult == 0)
-		{
-			int acceptResult {m_listener->acceptHost()};
-			if(acceptResult <= -1)
-			{
-				std::cerr << "Error: can't connect new client!" << std::endl;
-				m_isPollThreadRunning = false;
-				break;
-			}
-			else
-			{
-				std::cout << "New client connected on socket #" << acceptResult << std::endl;
-			}
-		}
-		else if(pollResult > 0)
-		{
-			unsigned int bufferSize {4096};
-			char buffer [bufferSize];
-
-			long int receivedBytes {m_listener->receive(pollResult, buffer, bufferSize)};
-			if(receivedBytes <= -1)
-			{
-				std::cerr << "Error: can't receive data! Socket #" << pollResult << std::endl;
-			}
-			else if(receivedBytes == 0)
-			{
-				std::cout << "Client disconnected. Socket #" << pollResult << std::endl;
-				m_listener->removeSocket(pollResult);
-			}
-			else
-			{
-				std::string receivedData {buffer};
-				receive(pollResult, receivedData);
-			}
-		}
+		std::cerr << "Error: can't send data!\n";
+		return -1;
 	}
+	return 0;
 }
 
-void Server::receive(int senderSockfd, const std::string& receivedData)
-{
-	std::cout << "CLIENT #" << senderSockfd << "> " << receivedData << std::endl;
-
-	if(receivedData.find("/sendfile") == 0)
-	{
-		std::string fileName {receivedData.begin() + receivedData.find_first_not_of("/sendfile "), receivedData.end()};
-		std::cout << "Request to send file: \"" << fileName << "\"" << std::endl;
-
-		m_listener->sendAllExcept(senderSockfd, "/receivefile " + fileName);
-		std::this_thread::sleep_for(std::chrono::milliseconds(50));
-
-		if(waitForAcceptFile(senderSockfd) <= -1)
-		{
-			std::cout << "File not accepted." << std::endl;
-			m_listener->sendData(senderSockfd, "/rejectfile");
-		}
-		else
-		{
-			std::cout << "File accepted." << std::endl;
-			m_listener->sendData(senderSockfd, "/acceptfile");
-
-			std::this_thread::sleep_for(std::chrono::milliseconds(50));
-
-			transferFile(senderSockfd, fileName);
-		}
-	}
-	else
-	{
-		m_listener->sendAllExcept(senderSockfd, receivedData);
-	}
-}
 
 int Server::waitForAcceptFile(int senderSockfd)
 {
 	while(true)
 	{
-		int pollResult {m_listener->poll()};
+		int pollResult {poll()};
 		if(pollResult == -1)
 		{
-			std::cerr << "Error: select socket!" << std::endl;
+			std::cerr << "Error: select socket!\n";
 			return -1;
 		}
 		else if(pollResult > 0)
 		{
 			if(pollResult != senderSockfd)
 			{
-				unsigned int bufferSize {4096};
-				char buffer [bufferSize];
-
-				long int receivedBytes {m_listener->receive(pollResult, buffer, bufferSize)};
-				if(receivedBytes <= -1)
+				Data dataReceived {receive(pollResult)};
+				if(dataReceived.bytes <= -1)
 				{
-					std::cerr << "Error: can't receive data! Socket #" << pollResult << std::endl;
+					std::cerr << "Error: can't receive data! Socket #" << pollResult << "\n";
 					return -1;
 				}
-				else if(receivedBytes == 0)
+				else if(dataReceived.bytes == 0)
 				{
-					std::cout << "Client disconnected. Socket #" << pollResult << std::endl;
-					m_listener->removeSocket(pollResult);
+					std::cout << "Client disconnected. Socket #" << pollResult << "\n";
+					removeClient(pollResult);
 					return -1;
 				}
 				else
 				{
-					std::string data {buffer};
-					if(data.find("/acceptfile") == 0)
+					if(dataReceived.data.find("/acceptfile") == 0)
 						return 0;
 					else
 						return -1;
@@ -186,35 +146,29 @@ int Server::waitForAcceptFile(int senderSockfd)
 	return -1;
 }
 
-void Server::transferFile(int sourceSockfd, const std::string& fileName)
+int Server::transferFile(int sourceFd)
 {
-	unsigned int bufferSize {1024};
-	char buffer [bufferSize];
-
-	std::cout << "Starting to receive and send a file." << std::endl;
 	while(true)
 	{
-		memset(buffer, 0, bufferSize);
-		long int bytesReceived {m_listener->receive(sourceSockfd, buffer, bufferSize)};
-		if(bytesReceived <= -1)
+		Data dataReceived {receive(sourceFd)};
+		if(dataReceived.bytes <= -1)
 		{
-			std::cerr << "Error: receiving file!" << std::endl;
-			break;
+			std::cerr << "Error: can't receive file!\n";
+			return -1;
 		}
-		else if(bytesReceived == 0)
+		else if(dataReceived.bytes == 0)
 		{
-			std::cout << "Client disconnected." << std::endl;
-			m_listener->removeSocket(sourceSockfd);
-			break;
+			std::cerr << "Error: client disconnected!\n";
+			removeClient(sourceFd);
+			return -1;
 		}
 		else
 		{
-			std::string data {buffer};
-			m_listener->sendAllExcept(sourceSockfd, data);
+			m_listener->sendAllExcept(sourceFd, dataReceived.data);
 
-			if(data.find("/endfile") == 0)
+			if(dataReceived.data.find("/endfile") == 0)
 				break;
 		}
 	}
-	std::cout << "Finished sending file.\n";
+	return 0;
 }

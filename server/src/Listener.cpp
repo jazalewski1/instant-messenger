@@ -158,10 +158,13 @@ long int Listener::sendAll(const std::string& data)
 		if(FD_ISSET(sockfdItr, &m_master))
 		{
 			if(sockfdItr != m_listeningSockfd)
-				return sendData(sockfdItr, data);
+			{
+				if(sendData(sockfdItr, data) == -1)
+					return -1;
+			}
 		}
 	}
-	return -1;
+	return 0;
 }
 
 long int Listener::sendAllExcept(int exceptSockfd, const std::string& data)
@@ -171,10 +174,13 @@ long int Listener::sendAllExcept(int exceptSockfd, const std::string& data)
 		if(FD_ISSET(sockfdItr, &m_master))
 		{
 			if(sockfdItr != m_listeningSockfd && sockfdItr != exceptSockfd)
-				return sendData(sockfdItr, data);
+			{
+				if(sendData(sockfdItr, data) == -1)
+					return -1;
+			}
 		}
 	}
-	return -1;
+	return 0;
 }
 
 void Listener::displayInfo(const std::string& name, sockaddr_in* saddrPtr)

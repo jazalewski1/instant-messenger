@@ -1,4 +1,5 @@
 #include <Host.hpp>
+#include <Utils.hpp>
 #include <arpa/inet.h>
 #include <iostream>
 #include <netdb.h>
@@ -34,7 +35,7 @@ int Host::conn(const std::string& ip_address, int port_number)
 	hints.sin_port = htons(port_number);
 	inet_pton(AF_INET, ip_address.c_str(), &hints.sin_addr);
 
-	display_info("Server", &hints); // TODO: move elsewhere, best to Client
+	Utils::display_info("Server", &hints); // TODO: move elsewhere, best to Client
 
 	return connect(m_sockfd, (sockaddr*)&hints, sizeof(hints));
 }
@@ -64,17 +65,4 @@ long int Host::receive_blocking(char* buffer, int buffer_size)
 long int Host::send_data(const std::string& data)
 {
 	return send(m_sockfd, data.c_str(), static_cast<int>(data.length()), 0);
-}
-
-void Host::display_info(const std::string& name, sockaddr_in* sock_addr_ptr) // TODO: could return an std::pair of strings
-{
-	char ip [NI_MAXHOST];
-	memset(ip, 0, NI_MAXHOST);
-	char port [NI_MAXSERV];
-	memset(port, 0, NI_MAXSERV);
-
-	getnameinfo((sockaddr*)&sock_addr_ptr, sizeof(sockaddr_in), ip, NI_MAXHOST, nullptr, 0, 0);
-
-	inet_ntop(AF_INET, &sock_addr_ptr->sin_addr, ip, NI_MAXHOST);
-	std::cout << name << " IP: " << ip << ", port: " << ntohs(sock_addr_ptr->sin_port) << std::endl;
 }

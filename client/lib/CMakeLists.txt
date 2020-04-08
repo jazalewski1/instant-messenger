@@ -14,6 +14,10 @@ ${INCLUDES}
 ${SOURCES}
 )
 
+target_link_libraries(ClientLib
+PRIVATE UtilitiesLib
+)
+
 target_include_directories(ClientLib
 PUBLIC includes
 )

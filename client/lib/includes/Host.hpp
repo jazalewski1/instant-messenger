@@ -23,6 +23,4 @@ public:
 	long int receive_blocking(char* buffer, int buffer_size) override;
 
 	long int send_data(const std::string& data) override;
-
-	static void display_info(const std::string& name, sockaddr_in* sock_addr_ptr);
 };

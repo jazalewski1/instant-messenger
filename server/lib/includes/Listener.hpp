@@ -34,6 +34,4 @@ public:
 	long int send_all(const std::string& data) override;
 
 	long int send_to_except(int except_fd, const std::string& data) override;
-
-	static void display_info(const std::string& name, sockaddr_in* s_addr_ptr);
 };

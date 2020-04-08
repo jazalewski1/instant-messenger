@@ -1,4 +1,5 @@
 #include <Listener.hpp>
+#include <Utils.hpp>
 #include <arpa/inet.h>
 #include <iostream>
 #include <sys/socket.h>
@@ -67,7 +68,7 @@ int Listener::create_listening_socket(const std::string& port_number)
 
 	std::cout << "Listening socket #" << m_listening_fd << std::endl;
 
-	display_info("Server", (sockaddr_in*)list_result->ai_addr);
+	Utils::display_info("Server", (sockaddr_in*)list_result->ai_addr);
 	return 0;
 }
 
@@ -97,7 +98,7 @@ int Listener::accept_host()
 		return -1;
 
 	FD_SET(new_fd, &m_master);
-	display_info("Client", (sockaddr_in*)&remote_addr);
+	Utils::display_info("Client", (sockaddr_in*)&remote_addr);
 
 	if(new_fd > m_sockfd_count)
 		m_sockfd_count = new_fd;
@@ -181,17 +182,4 @@ long int Listener::send_to_except(int except_fd, const std::string& data)
 		}
 	}
 	return 0;
-}
-
-void Listener::display_info(const std::string& name, sockaddr_in* sock_addr_ptr) // TODO: could return std::pair of strings with ip and port
-{
-	char ip [NI_MAXHOST];
-	memset(ip, 0, NI_MAXHOST);
-	char port [NI_MAXSERV];
-	memset(port, 0, NI_MAXSERV);
-
-	getnameinfo((sockaddr*)&sock_addr_ptr, sizeof(sockaddr_in), ip, NI_MAXHOST, nullptr, 0, 0);
-
-	inet_ntop(AF_INET, &sock_addr_ptr->sin_addr, ip, NI_MAXHOST);
-	std::cout << name << "IP: " << ip << ", port: " << ntohs(sock_addr_ptr->sin_port) << std::endl;
 }

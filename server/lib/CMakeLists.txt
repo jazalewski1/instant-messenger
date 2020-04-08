@@ -15,6 +15,10 @@ ${INCLUDES}
 ${SOURCES}
 )
 
+target_link_libraries(ServerLib
+PRIVATE UtilitiesLib
+)
+
 target_include_directories(ServerLib
 PUBLIC includes
 )

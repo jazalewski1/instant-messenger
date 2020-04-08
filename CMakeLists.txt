@@ -10,6 +10,6 @@ add_subdirectory(server)
 
 add_subdirectory(client)
 
-add_subdirectory(googletest)
+add_subdirectory(lib/utils)
 
 add_subdirectory(tests)

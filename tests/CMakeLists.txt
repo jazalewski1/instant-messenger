@@ -1,6 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
-
-add_executable(ClientTest src/ClientTest.cpp)
+add_executable(ClientTest source/ClientTest.cpp)
 
 target_link_libraries(ClientTest
 PRIVATE ClientLib
@@ -15,7 +13,7 @@ PRIVATE mocks
 )
 
 
-add_executable(ServerTest src/ServerTest.cpp)
+add_executable(ServerTest source/ServerTest.cpp)
 
 target_link_libraries(ServerTest
 PRIVATE ServerLib

@@ -8,8 +8,8 @@
 class Listener : public IListener
 {
 private:
-	int m_listeningSockfd;
-	int m_sockfdCount;
+	int m_listening_fd;
+	int m_sockfd_count;
 	fd_set m_master;
 
 public:
@@ -17,23 +17,23 @@ public:
 
 	~Listener();
 
-	int createListeningSocket(const std::string& portNumber) override;
+	int create_listening_socket(const std::string& port_number) override;
 
-	int startListening() override;
+	int start_listening() override;
 
-	int acceptHost() override;
+	int accept_host() override;
 
-	int removeSocket(int sockfd) override;
+	int remove_socket(int sockfd) override;
 
 	int poll() override;
 
-	long int receive(int sockfd, char* buffer, unsigned int bufferSize) override;
+	long int receive(int sockfd, char* buffer, unsigned int boffer_size) override;
 
-	long int sendData(int receiverSockfd, const std::string& data) override;
+	long int send_data(int receiver_fd, const std::string& data) override;
 
-	long int sendAll(const std::string& data) override;
+	long int send_all(const std::string& data) override;
 
-	long int sendAllExcept(int exceptSockfd, const std::string& data) override;
+	long int send_to_except(int except_fd, const std::string& data) override;
 
-	static void displayInfo(const std::string& name, sockaddr_in* saddrPtr);
+	static void display_info(const std::string& name, sockaddr_in* s_addr_ptr);
 };

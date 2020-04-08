@@ -19,10 +19,10 @@ using namespace testing;
 
 TEST_F(ServerTest, ConnectSuccess)
 {
-	EXPECT_CALL(listener, createListeningSocket("9999"))
+	EXPECT_CALL(listener, create_listening_socket("9999"))
 	.WillOnce(Return(0));
 
-	EXPECT_CALL(listener, startListening)
+	EXPECT_CALL(listener, start_listening)
 	.WillOnce(Return(0));
 
 	EXPECT_EQ(server.connect("9999"), 0);
@@ -30,10 +30,10 @@ TEST_F(ServerTest, ConnectSuccess)
 
 TEST_F(ServerTest, ConnectFailure)
 {
-	EXPECT_CALL(listener, createListeningSocket("9999"))
+	EXPECT_CALL(listener, create_listening_socket("9999"))
 	.WillOnce(Return(-1));
 
-	EXPECT_CALL(listener, startListening)
+	EXPECT_CALL(listener, start_listening)
 	.Times(0);
 
 	EXPECT_EQ(server.connect("9999"), -1);
@@ -41,10 +41,10 @@ TEST_F(ServerTest, ConnectFailure)
 
 TEST_F(ServerTest, ConnectFailure2)
 {
-	EXPECT_CALL(listener, createListeningSocket("9999"))
+	EXPECT_CALL(listener, create_listening_socket("9999"))
 	.WillOnce(Return(0));
 
-	EXPECT_CALL(listener, startListening)
+	EXPECT_CALL(listener, start_listening)
 	.WillOnce(Return(-1));
 
 	EXPECT_EQ(server.connect("9999"), -1);
@@ -88,24 +88,24 @@ TEST_F(ServerTest, ReceiveFailure)
 	EXPECT_EQ(server.receive(5).bytes, expected.bytes);
 }
 
-TEST_F(ServerTest, SendToSuccess)
+TEST_F(ServerTest, send_toSuccess)
 {
 	const std::string msg {"test message"};
 
-	EXPECT_CALL(listener, sendData(5, msg))
+	EXPECT_CALL(listener, send_data(5, msg))
 	.WillOnce(Return(msg.length()));
 
-	EXPECT_EQ(server.sendTo(5, msg), 0);
+	EXPECT_EQ(server.send_to(5, msg), 0);
 }
 
-TEST_F(ServerTest, SendToFailure)
+TEST_F(ServerTest, send_toFailure)
 {
 	const std::string msg {"test message"};
 
-	EXPECT_CALL(listener, sendData(5, msg))
+	EXPECT_CALL(listener, send_data(5, msg))
 	.WillOnce(Return(-1));
 
-	EXPECT_EQ(server.sendTo(5, msg), -1);
+	EXPECT_EQ(server.send_to(5, msg), -1);
 }
 
 TEST_F(ServerTest, AcceptFileSuccess1)
@@ -118,7 +118,7 @@ TEST_F(ServerTest, AcceptFileSuccess1)
 	EXPECT_CALL(listener, receive)
 	.WillOnce(Return(acceptMsg.length()));
 
-	server.waitForAcceptFile(5);
+	server.wait_for_accept_file(5);
 }
 
 TEST_F(ServerTest, AcceptFileSuccess2)
@@ -137,7 +137,7 @@ TEST_F(ServerTest, AcceptFileSuccess2)
 	EXPECT_CALL(listener, receive)
 	.WillOnce(Return(acceptMsg.length()));
 
-	server.waitForAcceptFile(5);
+	server.wait_for_accept_file(5);
 }
 
 TEST_F(ServerTest, AcceptFileFailure1)
@@ -148,7 +148,7 @@ TEST_F(ServerTest, AcceptFileFailure1)
 	EXPECT_CALL(listener, receive)
 	.Times(0);
 
-	server.waitForAcceptFile(5);
+	server.wait_for_accept_file(5);
 }
 
 TEST_F(ServerTest, AcceptFileFailure2)
@@ -159,10 +159,10 @@ TEST_F(ServerTest, AcceptFileFailure2)
 	EXPECT_CALL(listener, receive)
 	.WillOnce(Return(-1));
 
-	EXPECT_EQ(server.waitForAcceptFile(5), -1);
+	EXPECT_EQ(server.wait_for_accept_file(5), -1);
 }
 
-TEST_F(ServerTest, TransferFileFailure1)
+TEST_F(ServerTest, transfer_fileFailure1)
 {
 	const std::string msg {"test file"};
 
@@ -171,14 +171,14 @@ TEST_F(ServerTest, TransferFileFailure1)
 	EXPECT_CALL(listener, receive)
 	.WillOnce(Return(msg.length()));
 
-	EXPECT_CALL(listener, sendAllExcept)
+	EXPECT_CALL(listener, send_to_except)
 	.Times(1);
 
 	EXPECT_CALL(listener, receive)
 	.WillOnce(Return(-1));
 
-	EXPECT_CALL(listener, sendAllExcept)
+	EXPECT_CALL(listener, send_to_except)
 	.Times(0);
 
-	server.transferFile(5);
+	server.transfer_file(5);
 }

@@ -61,7 +61,7 @@ public:
 			}
 			else if(poll_result == 0)
 			{
-				if(server.addClient() == -1)
+				if(server.add_client() == -1)
 					break;
 			}
 			else if(poll_result > 0)
@@ -74,7 +74,7 @@ public:
 				}
 				else if(data_received.bytes == 0)
 				{
-					if(server.removeClient(poll_result) == -1)
+					if(server.remove_client(poll_result) == -1)
 						break;
 				}
 				else
@@ -86,27 +86,27 @@ public:
 						std::string filename {data_received.data.begin() + data_received.data.find(' ') + 1, data_received.data.end()};
 						std::cout << "Request to send file: \"" << filename << "\"" << std::endl;
 
-						server.sendExcept(poll_result, "/receivefile " + filename);
+						server.send_to_except(poll_result, "/receivefile " + filename);
 						std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
-						if(server.waitForAcceptFile(poll_result) == -1)
+						if(server.wait_for_accept_file(poll_result) == -1)
 						{
 							std::cout << "File not accepted." << std::endl;
-							server.sendTo(poll_result, "/rejectfile");
+							server.send_to(poll_result, "/rejectfile");
 						}
 						else
 						{
 							std::cout << "File accepted." << std::endl;
-							server.sendTo(poll_result, "/acceptfile");
+							server.send_to(poll_result, "/acceptfile");
 
 							std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
-							server.transferFile(poll_result);
+							server.transfer_file(poll_result);
 						}
 					}
 					else
 					{
-						server.sendExcept(poll_result, data_received.data);
+						server.send_to_except(poll_result, data_received.data);
 					}
 				}
 			}

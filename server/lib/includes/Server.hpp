@@ -14,21 +14,21 @@ private:
 public:
 	Server(IListener* listener);
 
-	int connect(const std::string& portNumber);
+	int connect(const std::string& port_number);
 
-	int addClient();
+	int add_client();
 
-	int removeClient(int sockfd);
+	int remove_client(int sockfd);
 
 	int poll();
 
-	Data receive(int sourceFd);
+	Data receive(int source_fd);
 
-	int sendTo(int destinationFd, const std::string& data);
+	int send_to(int source_fd, const std::string& data);
 
-	int sendExcept(int exceptFd, const std::string& data);
+	int send_to_except(int except_fd, const std::string& data);
 
-	int waitForAcceptFile(int sourceFd);
+	int wait_for_accept_file(int source_fd);
 
-	int transferFile(int sourceFd);
+	int transfer_file(int source_fd);
 };

@@ -1,5 +1,9 @@
 add_executable(Client app/Main.cpp)
 
+target_include_directories(Client
+PRIVATE app
+)
+
 add_subdirectory(lib)
 
 find_package(Threads)

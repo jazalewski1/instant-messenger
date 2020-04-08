@@ -1,5 +1,9 @@
 add_executable(Server app/Main.cpp)
 
+target_include_directories(Server
+PRIVATE app
+)
+
 add_subdirectory(lib)
 
 find_package(Threads)

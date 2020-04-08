@@ -8,15 +8,15 @@
 class App
 {
 private:
-	std::string m_ipAddress;
-	int m_portNumber;
+	std::string m_ip_address;
+	int m_port_number;
 	Host m_host;
 	Client m_client;
 
 
 public:
-	App(std::string ipAddress, int portNumber) :
-		m_ipAddress{ipAddress}, m_portNumber{portNumber},
+	App(std::string ip_address, int port_number) :
+		m_ip_address{ip_address}, m_port_number{port_number},
 		m_host{}, m_client{&m_host}
 	{
 	}
@@ -27,8 +27,8 @@ public:
 
 	int run()
 	{
-		int connectResult {m_client.connect(m_ipAddress, m_portNumber)};
-		if(connectResult <= -1)
+		auto connect_result = m_client.connect(m_ip_address, m_port_number);
+		if(connect_result <= -1)
 		{
 			std::cerr << "Error: can't connect to server!" << std::endl;
 			return -1;

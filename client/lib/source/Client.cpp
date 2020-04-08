@@ -14,31 +14,31 @@
 
 Client::Client(IHost* host) :
 	m_host{host},
-	m_isReceiveThreadRunning{false},
-	m_receiveThreadWantsInput{false},
-	m_receiveInput{}
+	m_is_receive_thread_running{false},
+	m_receive_thread_wants_input{false},
+	m_receive_input{}
 {
 }
 
 Client::~Client()
 {
-	m_isReceiveThreadRunning = false;
-	if(m_receiveThread.joinable())
-		m_receiveThread.join();
+	m_is_receive_thread_running = false;
+	if(m_receive_thread.joinable())
+		m_receive_thread.join();
 
 	std::cout << "Closing client." << std::endl;
 }
 
 // RETURNS: 0 on success; -1 on error
-int Client::connect(const std::string& ipAddress, int portNumber)
+int Client::connect(const std::string& ip_address, int port_number)
 {
-	if(m_host->createSocket() <= -1)
+	if(m_host->create_socket() <= -1)
 	{
 		std::cerr << "Erorr: can't create a socket!" << std::endl;
 		return -1;
 	}
 
-	if(m_host->conn(ipAddress, portNumber) <= -1)
+	if(m_host->conn(ip_address, port_number) <= -1)
 	{
 		std::cerr << "Error: can't connect!" << std::endl;
 		return -1;
@@ -49,16 +49,16 @@ int Client::connect(const std::string& ipAddress, int portNumber)
 
 void Client::start()
 {
-	m_isReceiveThreadRunning = true;
-	m_receiveThread = std::thread{&Client::startReceiving, this};
+	m_is_receive_thread_running = true;
+	m_receive_thread = std::thread{&Client::start_receiving, this};
 }
 
 int Client::update(const std::string& input)
 {
-	if(m_receiveThreadWantsInput)
+	if(m_receive_thread_wants_input)
 	{
-		m_receiveInput = input;
-		m_receiveThreadWantsInput = false;
+		m_receive_input = input;
+		m_receive_thread_wants_input = false;
 		return 1;
 	}
 
@@ -68,34 +68,34 @@ int Client::update(const std::string& input)
 	}
 	else if(input.find("/sendfile") == 0)
 	{
-		long unsigned int whiteIndex {input.find_first_not_of("/sendfile")};
-		if(whiteIndex == std::string::npos || whiteIndex == input.length() - 1)
+		auto whitespace_index = input.find_first_not_of("/sendfile");
+		if(whitespace_index == std::string::npos || whitespace_index == input.length() - 1)
 		{
 			std::cerr << "Usage: \"/sendfile <absolutePathToFile>\"" << std::endl;
 			return 1;
 		}
 		else
 		{
-			std::string filePath {input.begin() + whiteIndex + 1, input.end()};
+			std::string filepath {input.begin() + whitespace_index + 1, input.end()};
 
-			std::ifstream inFile;
-			int requestResult {requestSendFile(filePath, inFile)};
-			if(requestResult <= -1)
+			std::ifstream in_file;
+			auto request_result = request_send_file(filepath, in_file);
+			if(request_result <= -1)
 			{
 				std::cerr << "Error: request failed!" << std::endl;
 				return 1;
 			}
 
-			int sendFileResult {sendFile(inFile)};
-			if(sendFileResult <= -1)
+			auto send_file_result = send_file(in_file);
+			if(send_file_result <= -1)
 			{
 				std::cerr << "Error: failed to send file!" << std::endl;
 				return 0;
 			}
-			inFile.close();
+			in_file.close();
 
 			std::this_thread::sleep_for(std::chrono::milliseconds(50));
-			m_host->sendData("/endfile");
+			m_host->send_data("/endfile");
 
 			std::cout << "File sent succesfully." << std::endl;
 		}
@@ -107,13 +107,13 @@ int Client::update(const std::string& input)
 	}
 	else
 	{
-		long int sentBytes {m_host->sendData(input)};
-		if(sentBytes == -1)
+		auto sent_bytes = m_host->send_data(input);
+		if(sent_bytes == -1)
 		{
 			std::cerr << "Error: can't send data!" << std::endl;
 			return -1;
 		}
-		else if(sentBytes == 0)
+		else if(sent_bytes == 0)
 		{
 			std::cout << "Disconnecting..." << std::endl;
 			return -1;
@@ -122,153 +122,153 @@ int Client::update(const std::string& input)
 	return 1;
 }
 
-void Client::startReceiving()
+void Client::start_receiving()
 {
-	while(m_isReceiveThreadRunning)
+	while(m_is_receive_thread_running)
 	{
-		unsigned int bufferSize {4096};
-		char buffer [bufferSize];
+		constexpr auto buffer_size = 4096U;
+		char buffer [buffer_size];
 
-		long int receivedBytes {m_host->receiveNonblocking(buffer, static_cast<int>(bufferSize))};
-		if(receivedBytes == -1)
+		auto received_bytes = m_host->receive_nonblocking(buffer, static_cast<int>(buffer_size));
+		if(received_bytes == -1)
 		{
 			std::cerr << "Error: can't receive data!" << std::endl;
-			m_isReceiveThreadRunning = false;
+			m_is_receive_thread_running = false;
 			break;
 		}
-		else if(receivedBytes == 0)
+		else if(received_bytes == 0)
 		{
 			std::cerr << "Server shut down." << std::endl;
-			m_isReceiveThreadRunning = false;
+			m_is_receive_thread_running = false;
 			break;
 		}
-		else if(receivedBytes > 0)
+		else if(received_bytes > 0)
 		{
-			std::string receivedData {buffer};
+			std::string received_data {buffer};
 
-			if(receivedData.find("/receivefile") == 0)
+			if(received_data.find("/receivefile") == 0)
 			{
-				std::string fileName {receivedData.begin() + receivedData.find_first_not_of("/receivefile "), receivedData.end()};
+				std::string filename {received_data.begin() + received_data.find_first_not_of("/receivefile "), received_data.end()};
 
-				std::ofstream outFile;
+				std::ofstream outfile;
 
-				int acceptFileResult {acceptFile(fileName, outFile)};
-				if(acceptFileResult <= -1)
+				auto accept_file_result = accept_file(filename, outfile);
+				if(accept_file_result <= -1)
 				{
 					std::cout << "File not accepted." << std::endl;
-					m_host->sendData("/rejectfile");
+					m_host->send_data("/rejectfile");
 				}
 				else
 				{
-					m_host->sendData("/acceptfile");
+					m_host->send_data("/acceptfile");
 					std::cout << "Starting to receive data." << std::endl;
 
-					long int fileReceivedBytes {receiveFile(outFile)};
-					if(fileReceivedBytes <= -1)
+					auto file_received_bytes = receive_file(outfile);
+					if(file_received_bytes <= -1)
 					{
 						std::cerr << "Error: can't receive file!" << std::endl;
 					}
 					else
 					{
-						std::cout << "Total received bytes: " << fileReceivedBytes << std::endl;
+						std::cout << "Total received bytes: " << file_received_bytes << std::endl;
 					}
 				}
-				outFile.close();
+				outfile.close();
 			}
 			else
 			{
-				std::cout << "CHAT> " << receivedData << std::endl;
+				std::cout << "CHAT> " << received_data << std::endl;
 			}
 		}
 	}
 }
 
 // RETURNS: 0 on accepted; -1 on rejected
-int Client::acceptFile(const std::string& fileName, std::ofstream& outFile)
+int Client::accept_file(const std::string& filename, std::ofstream& outfile)
 {
-	std::cout << "Incoming file. Filename: \"" << fileName << "\"" << std::endl;
+	std::cout << "Incoming file. Filename: \"" << filename << "\"" << std::endl;
 	std::cout << "Do you accept? [Y / N]" << std::endl;
 
-	m_receiveThreadWantsInput = true;
-	while(m_receiveThreadWantsInput)
+	m_receive_thread_wants_input = true;
+	while(m_receive_thread_wants_input)
 		std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
-	std::string input = m_receiveInput;
-	m_receiveInput.clear();
+	auto input = m_receive_input;
+	m_receive_input.clear();
 
 	if(input.find("Y") != 0)
 		return -1;
 
 	std::cout << "Enter absolute path to save file: " << std::endl;
-	m_receiveThreadWantsInput = true;
-	while(m_receiveThreadWantsInput)
+	m_receive_thread_wants_input = true;
+	while(m_receive_thread_wants_input)
 		std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-	std::string filePath {m_receiveInput};
-	m_receiveInput.clear();
+	auto filepath = m_receive_input;
+	m_receive_input.clear();
 
-	filePath.append(fileName);
+	filepath.append(filename);
 
-	outFile.open(filePath);
+	outfile.open(filepath);
 
-	if(!outFile.is_open())
+	if(!outfile.is_open())
 	{
 		std::cerr << "Error: can't open file! Path:" << std::endl;
-		std::cout << filePath << std::endl;
+		std::cout << filepath << std::endl;
 		return -1;
 	}
 	return 0;
 }
 
 // RETURNS: total received bytes on success; -1 on error
-long int Client::receiveFile(std::ostream& outFile)
+long int Client::receive_file(std::ostream& outfile)
 {
-	unsigned int bufferSize {4096};
-	char buffer [bufferSize];
-	long int totalReceivedBytes {0};
+	constexpr auto buffer_size = 4096U;
+	char buffer [buffer_size];
+	auto total_received_bytes = 0;
 	while(true)
 	{
-		memset(buffer, 0, bufferSize);
+		memset(buffer, 0, buffer_size);
 
-		long int receivedBytes {m_host->receiveNonblocking(buffer, bufferSize)}; // TODO: check if blocking works, because we don't want messages to be saved in a file
-		if(receivedBytes == -1)
+		auto received_bytes = m_host->receive_nonblocking(buffer, buffer_size); // TODO: check if blocking works, because we don't want messages to be saved in a file
+		if(received_bytes == -1)
 		{
 			std::cerr << "Error: failed to receive data!" << std::endl;
 			return -1;
 		}
-		else if(receivedBytes == 0)
+		else if(received_bytes == 0)
 		{
 			std::cerr << "Server shut down." << std::endl;
-			m_isReceiveThreadRunning = false;
+			m_is_receive_thread_running = false;
 			return -1;
 		}
-		else if(receivedBytes > 0)
+		else if(received_bytes > 0)
 		{
-			std::string str {buffer};
-			if(str.find("/endfile") == 0)
+			std::string data {buffer};
+			if(data.find("/endfile") == 0)
 				break;
 
-			outFile << buffer << std::endl;
-			totalReceivedBytes += receivedBytes;
+			outfile << buffer << std::endl;
+			total_received_bytes += received_bytes;
 		}
 	}
-	return totalReceivedBytes;
+	return total_received_bytes;
 }
 
-int Client::requestSendFile(const std::string& filePath, std::ifstream& inFile)
+int Client::request_send_file(const std::string& filepath, std::ifstream& in_file)
 {
-	inFile.open(filePath);
+	in_file.open(filepath);
 
-	std::string fileName {filePath.begin() + filePath.find_last_of('/') + 1, filePath.end()};
+	std::string filename {filepath.begin() + filepath.find_last_of('/') + 1, filepath.end()};
 
-	if(!inFile.is_open())
+	if(!in_file.is_open())
 	{
-		std::cerr << "Error: can't open file: \"" << fileName << "\"!" << std::endl;
+		std::cerr << "Error: can't open file: \"" << filename << "\"!" << std::endl;
 		return -1;
 	}
 
-	m_host->sendData("/sendfile " + fileName);
-	if(waitForAcceptFile() <= -1)
+	m_host->send_data("/sendfile " + filename);
+	if(wait_for_accept_file() <= -1)
 	{
 		std::cerr << "Error: file not accepted." << std::endl;
 		return -1;
@@ -277,27 +277,27 @@ int Client::requestSendFile(const std::string& filePath, std::ifstream& inFile)
 }
 
 // RETURNS: 0 on accepted; -1 on rejected
-int Client::waitForAcceptFile()
+int Client::wait_for_accept_file()
 {
-	unsigned int bufferSize {4096};
-	char buffer [bufferSize];
-	memset(&buffer, 0, bufferSize);
+	auto buffer_size = 4096U;
+	char buffer [buffer_size];
+	memset(&buffer, 0, buffer_size);
 
 	std::cout << "Waiting for accepting the file..." << std::endl;
-	long int receivedBytes {m_host->receiveBlocking(buffer, bufferSize)};
-	if(receivedBytes <= -1)
+	auto received_bytes = m_host->receive_blocking(buffer, buffer_size);
+	if(received_bytes <= -1)
 	{
 		std::cerr << "Error: can't receive data!" << std::endl;
-		m_isReceiveThreadRunning = false;
+		m_is_receive_thread_running = false;
 		return -1;
 	}
-	else if(receivedBytes == 0)
+	else if(received_bytes == 0)
 	{
 		std::cerr << "Server shut down." << std::endl;
-		m_isReceiveThreadRunning = false;
+		m_is_receive_thread_running = false;
 		return -1;
 	}
-	else if(receivedBytes > 0)
+	else if(received_bytes > 0)
 	{
 		std::string data {buffer};
 		if(data.find("/acceptfile") == 0)
@@ -309,28 +309,28 @@ int Client::waitForAcceptFile()
 }
 
 // RETURN: total sent bytes on success; -1 on error
-int Client::sendFile(std::ifstream& inFile)
+int Client::send_file(std::ifstream& in_file)
 {
 	std::cout << "Starting to read from file." << std::endl;
-	std::vector<char> buffer (1024, 0);
+	std::vector<char> buffer (4096U, 0);
 
-	inFile.read(buffer.data(), buffer.size());
-	std::streamsize s {inFile.gcount()};
+	in_file.read(buffer.data(), buffer.size());
+	auto s = in_file.gcount();
 
-	long int totalBytesSent {0};
+	auto total_sent_bytes = 0L;
 
 	while(s > 0)
 	{
-		long int sentBytes {m_host->sendData(buffer.data())};
-		if(sentBytes <= -1)
+		auto sent_bytes = m_host->send_data(buffer.data());
+		if(sent_bytes <= -1)
 		{
 			std::cerr << "Error: can't send data!" << std::endl;
 			return -1;
 		}
-		totalBytesSent += sentBytes;
+		total_sent_bytes += sent_bytes;
 
-		inFile.read(buffer.data(), buffer.size());
-		s = inFile.gcount();
+		in_file.read(buffer.data(), buffer.size());
+		s = in_file.gcount();
 	}
-	return totalBytesSent;
+	return total_sent_bytes;
 }

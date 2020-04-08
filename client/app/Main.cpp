@@ -6,14 +6,14 @@ int main(int argc, char* argv[])
 {
 	if(argc != 3)
 	{
-		std::cerr << "Usage: " << argv[0] << " ipAddress portNumber" << std::endl;
+		std::cerr << "Usage: " << argv[0] << " ipAddress port_number" << std::endl;
 		return -1;
 	}
 
-	std::string ipAddress {argv[1]};
-	int portNumber {std::stoi(argv[2])};
+	std::string ip_address {argv[1]};
+	int port_number {std::stoi(argv[2])};
 
-	App app {ipAddress, portNumber};
+	App app {ip_address, port_number};
 
 	app.run();
 

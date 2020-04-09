@@ -27,38 +27,3 @@ TEST_F(ClientTest, ConenctionTest)
 
 	client.connect(ipAddress, portNumber);
 }
-
-TEST_F(ClientTest, CloseTest)
-{
-	EXPECT_EQ(client.update("/close"), 0);
-}
-
-TEST_F(ClientTest, MessageTest)
-{
-	std::string input {"this is a message"};
-
-	EXPECT_CALL(host, send_data(input))
-	.Times(1);
-
-	client.update(input);
-}
-
-TEST_F(ClientTest, SendfileTest)
-{
-	std::string input {"/sendfile CMakeLists.txt"};
-
-	EXPECT_CALL(host, send_data(input))
-	.Times(1);
-
-	client.update(input);
-}
-
-TEST_F(ClientTest, SendfileWrongCommandTest)
-{
-	std::string input {"/sendfile"};
-
-	EXPECT_CALL(host, send_data(input))
-	.Times(0);
-
-	client.update(input);
-}

@@ -17,6 +17,7 @@ add_executable(ServerTest source/ServerTest.cpp)
 
 target_link_libraries(ServerTest
 PRIVATE ServerLib
+PRIVATE UtilitiesLib
 PRIVATE gtest
 PRIVATE gtest_main
 PRIVATE gmock

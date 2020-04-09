@@ -12,4 +12,6 @@ add_subdirectory(client)
 
 add_subdirectory(lib/utils)
 
+add_subdirectory(googletest)
+
 add_subdirectory(tests)

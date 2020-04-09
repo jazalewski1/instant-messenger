@@ -11,7 +11,7 @@ int main(int argc, char* argv[])
 
 	App app {argv[1]};
 
-	app.run();
+	app.start();
 
 	return 0;
 }

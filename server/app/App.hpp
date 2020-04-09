@@ -1,4 +1,4 @@
-#include <Data.hpp>
+#include <Exceptions.hpp>
 #include <Listener.hpp>
 #include <Server.hpp>
 #include <string>
@@ -8,17 +8,16 @@ class App
 {
 private:
 	const std::string m_port_number;
-
 	Listener m_listener;
 	Server m_server;
-
 	std::thread m_input_thread;
+	bool m_is_app_running;
 
 public:
 	App(std::string port_number) :
 		m_port_number{port_number},
-		m_listener{},
-		m_server{&m_listener}
+		m_listener{}, m_server{&m_listener},
+		m_is_app_running{false}
 	{
 	}
 
@@ -27,89 +26,213 @@ public:
 		if(m_input_thread.joinable())
 			m_input_thread.join();
 
-		std::cout << "Closing.\n";
+		std::cout << "Closing server.\n";
 	}
 
-	int run()
+	void input_loop()
 	{
-		std::cout << "Starting server.\n";
-		if(m_server.connect(m_port_number) <= -1)
+		std::string input {};
+		while(m_is_app_running)
 		{
-			std::cerr << "Error: can't connect the server!\n";
-			return -1;
-		}
-
-		std::cout << "Enter \"/close\" to close server.\n";
-
-		bool is_server_running {true};
-		m_input_thread  = std::thread{[&]{
-			std::string input;
-			while(is_server_running)
+			std::getline(std::cin, input);
+			if(input == "/close")
 			{
-				std::getline(std::cin, input);
-				if(input.find("/close") == 0)
-					is_server_running = false;
-			}
-		}};
-
-		while(is_server_running)
-		{
-			int poll_result {m_server.poll()};
-			if(poll_result == -1)
-			{
+				m_is_app_running = false;
 				break;
 			}
-			else if(poll_result == 0)
+		}
+	}
+
+	void receive_loop()
+	{
+		while(m_is_app_running)
+		{
+			int poll_result;
+			try { poll_result = m_server.poll(); }
+			catch(const Util::poll_error&)
 			{
-				if(m_server.add_client() == -1)
-					break;
+				std::cerr << "Error: can't poll!\n";
+				m_is_app_running = false;
+				break;
+			}
+			catch(const Util::timeout_exception&)
+			{
+				continue;
+			}
+
+			if(poll_result == 0)
+			{
+				try { m_server.add_client(); }
+				catch(const Util::accept_error&)
+				{
+					std::cerr << "Error: can't add client!\n";
+				}
 			}
 			else if(poll_result > 0)
 			{
-				Data data_received {m_server.receive(poll_result)};
+				std::string received_data;
 
-				if(data_received.bytes == -1)
+				try { received_data = m_server.receive_from(poll_result); }
+				catch(const Util::receive_error&)
 				{
+					std::cerr << "Error: can't receive data!\n";
+					m_is_app_running = false;
 					break;
 				}
-				else if(data_received.bytes == 0)
+				catch(const Util::disconnected_exception&)
 				{
-					if(m_server.remove_client(poll_result) == -1)
-						break;
-				}
-				else
-				{
-					std::cout << "CLIENT #" << poll_result << "> " << data_received.data << std::endl;
-
-					if(data_received.data.find("/sendfile") == 0)
+					try { m_server.remove_client(poll_result); }	
+					catch(Util::remove_error& rem_exc)
 					{
-						std::string filename {data_received.data.begin() + data_received.data.find(' ') + 1, data_received.data.end()};
-						std::cout << "Request to send file: \"" << filename << "\"" << std::endl;
+						std::cerr << "Error: can't remove client!\n";
+						m_is_app_running = false;
+						break;
+					}
+					continue;
+				}
 
-						m_server.send_to_except(poll_result, "/receivefile " + filename);
+				std::cout << "CLIENT #" << poll_result << "> " << received_data << std::endl;
+
+				if(received_data.find("/sendfile") == 0)
+				{
+					std::string filename {received_data.begin() + received_data.find(' ') + 1, received_data.end()};
+					std::cout << "Request to send file: \"" << filename << "\"" << std::endl;
+
+					try { m_server.send_to_except(poll_result, "/receivefile " + filename); }
+					catch(const Util::send_error&)
+					{
+						std::cerr << "Error: can't send data!\n";
+						m_is_app_running = false;
+						break;
+					}
+					std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+					if(wait_for_accept_file(poll_result))
+					{
+						std::cout << "File accepted." << std::endl;
+						try { m_server.send_to(poll_result, "/acceptfile"); }
+						catch(const Util::send_error&)
+						{
+							std::cerr << "Error: can't send data!\n";
+							m_is_app_running = false;
+							break;
+						}
 						std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
-						if(m_server.wait_for_accept_file(poll_result) == -1)
-						{
-							std::cout << "File not accepted." << std::endl;
-							m_server.send_to(poll_result, "/rejectfile");
-						}
-						else
-						{
-							std::cout << "File accepted." << std::endl;
-							m_server.send_to(poll_result, "/acceptfile");
-
-							std::this_thread::sleep_for(std::chrono::milliseconds(50));
-
-							m_server.transfer_file(poll_result);
-						}
+						transfer_file(poll_result);
 					}
 					else
 					{
-						m_server.send_to_except(poll_result, data_received.data);
+						std::cout << "File not accepted." << std::endl;
+						try { m_server.send_to(poll_result, "/rejectfile"); }
+						catch(const Util::send_error&)
+						{
+							std::cerr << "Error: can't send data!\n";
+							m_is_app_running = false;
+							break;
+						}
+					}
+				}
+				else
+				{
+					try { m_server.send_to_except(poll_result, received_data); }
+					catch(const Util::send_error&)
+					{
+						std::cerr << "Error: can't send data!\n";
+						m_is_app_running = false;
+						break;
 					}
 				}
 			}
+		}
+	}
+
+	void start()
+	{
+		std::cout << "Starting server.\n";
+
+		try { m_server.connect(m_port_number); }
+		catch(const Util::exception&)
+		{
+			std::cerr << "Error: can't connect the server!\n";
+			return;
+		}
+
+		m_is_app_running = true;
+
+		std::cout << "Enter \"/close\" to close server.\n";
+
+		m_input_thread = std::thread{&App::input_loop, this};
+		receive_loop();
+	}
+
+	bool wait_for_accept_file(int sender_fd)
+	{
+		while(true)
+		{
+			int poll_result;
+			try
+			{
+				poll_result = m_server.poll();
+			}
+			catch(Util::poll_error& poll_exc)
+			{
+				std::cerr << "Error: polling error!\n";
+				break;
+			}
+
+			if(poll_result != sender_fd)
+			{
+				std::string received_data;
+				try { received_data = m_server.receive_from(poll_result); }
+				catch(Util::receive_error& rec_exc)
+				{
+					std::cerr << "Error: can't receive data! Socket #" << poll_result << "\n";
+					break;
+				}
+				catch(Util::disconnected_exception& dis_exc)
+				{
+					std::cout << "Client disconnected. Socket #" << poll_result << "\n";
+					m_server.remove_client(poll_result);
+					break;
+				}
+
+				if(received_data.find("/acceptfile") == 0)
+					return true;
+				else
+					break;
+			}
+		}
+		return false;
+	}
+
+	void transfer_file(int source_fd)
+	{
+		while(true)
+		{
+			std::string received_data;
+			try { received_data = m_server.receive_from(source_fd); }
+			catch(const Util::receive_error&)
+			{
+				std::cerr << "Error: can't receive file!\n";
+				break;
+			}
+			catch(const Util::disconnected_exception&)
+			{
+				std::cerr << "Error: client disconnected file receiving file!\n";
+				m_server.remove_client(source_fd);
+				break;
+			}
+
+			try { m_server.send_to_except(source_fd, received_data); }
+			catch(const Util::send_error&)
+			{
+				std::cerr << "Error: can't send file data!\n";
+				break;
+			}
+
+			if(received_data.find("/endfile") == 0)
+				break;
 		}
 	}
 };

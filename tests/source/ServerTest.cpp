@@ -70,22 +70,22 @@ TEST_F(ServerTest, ReceiveSuccess)
 {
 	const std::string msg {"test message"};
 
-	EXPECT_CALL(listener, receive)
+	EXPECT_CALL(listener, receive_data)
 	.WillOnce(Return(msg.length()));
 
 	Data expected {static_cast<long int>(msg.length()), msg};
 
-	EXPECT_EQ(server.receive(5).bytes, expected.bytes);
+	EXPECT_EQ(server.receive_from(5).bytes, expected.bytes);
 }
 
 TEST_F(ServerTest, ReceiveFailure)
 {
-	EXPECT_CALL(listener, receive)
+	EXPECT_CALL(listener, receive_data)
 	.WillOnce(Return(-1));
 
 	Data expected {-1, ""};
 
-	EXPECT_EQ(server.receive(5).bytes, expected.bytes);
+	EXPECT_EQ(server.receive_from(5).bytes, expected.bytes);
 }
 
 TEST_F(ServerTest, send_toSuccess)
@@ -115,7 +115,7 @@ TEST_F(ServerTest, AcceptFileSuccess1)
 
 	const std::string acceptMsg {"/accept"};
 
-	EXPECT_CALL(listener, receive)
+	EXPECT_CALL(listener, receive_data)
 	.WillOnce(Return(acceptMsg.length()));
 
 	server.wait_for_accept_file(5);
@@ -134,7 +134,7 @@ TEST_F(ServerTest, AcceptFileSuccess2)
 
 	const std::string acceptMsg {"/accept"};
 
-	EXPECT_CALL(listener, receive)
+	EXPECT_CALL(listener, receive_data)
 	.WillOnce(Return(acceptMsg.length()));
 
 	server.wait_for_accept_file(5);
@@ -145,7 +145,7 @@ TEST_F(ServerTest, AcceptFileFailure1)
 	EXPECT_CALL(listener, poll)
 	.WillOnce(Return(-1));
 
-	EXPECT_CALL(listener, receive)
+	EXPECT_CALL(listener, receive_data)
 	.Times(0);
 
 	server.wait_for_accept_file(5);
@@ -156,7 +156,7 @@ TEST_F(ServerTest, AcceptFileFailure2)
 	EXPECT_CALL(listener, poll)
 	.WillOnce(Return(3));
 
-	EXPECT_CALL(listener, receive)
+	EXPECT_CALL(listener, receive_data)
 	.WillOnce(Return(-1));
 
 	EXPECT_EQ(server.wait_for_accept_file(5), -1);
@@ -168,13 +168,13 @@ TEST_F(ServerTest, transfer_fileFailure1)
 
 	InSequence seq;
 
-	EXPECT_CALL(listener, receive)
+	EXPECT_CALL(listener, receive_data)
 	.WillOnce(Return(msg.length()));
 
 	EXPECT_CALL(listener, send_to_except)
 	.Times(1);
 
-	EXPECT_CALL(listener, receive)
+	EXPECT_CALL(listener, receive_data)
 	.WillOnce(Return(-1));
 
 	EXPECT_CALL(listener, send_to_except)

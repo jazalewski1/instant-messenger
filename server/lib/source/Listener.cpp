@@ -68,7 +68,7 @@ int Listener::create_listening_socket(const std::string& port_number)
 
 	std::cout << "Listening socket #" << m_listening_fd << std::endl;
 
-	Utils::display_info("Server", (sockaddr_in*)list_result->ai_addr);
+	Util::display_info("Server", (sockaddr_in*)list_result->ai_addr);
 	return 0;
 }
 
@@ -98,7 +98,7 @@ int Listener::accept_host()
 		return -1;
 
 	FD_SET(new_fd, &m_master);
-	Utils::display_info("Client", (sockaddr_in*)&remote_addr);
+	Util::display_info("Client", (sockaddr_in*)&remote_addr);
 
 	if(new_fd > m_sockfd_count)
 		m_sockfd_count = new_fd;
@@ -116,7 +116,7 @@ int Listener::remove_socket(int sockfd)
 // RETURNS: 0 on connection request; sender's sockfd on success; -1 on select() error; -2 on timeout
 int Listener::poll()
 {
-	fd_set master_copy {m_master}; // TODO: unsure of use of auto
+	fd_set master_copy {m_master};
 
 	timeval timeout;
 	timeout.tv_usec = 1000;
@@ -140,7 +140,7 @@ int Listener::poll()
 	return -2;
 }
 
-long int Listener::receive(int sockfd, char* buffer, unsigned int buffer_size)
+long int Listener::receive_data(int sockfd, char* buffer, unsigned int buffer_size)
 {
 	memset(buffer, 0, buffer_size);
 

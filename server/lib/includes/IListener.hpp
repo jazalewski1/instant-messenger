@@ -17,7 +17,7 @@ public:
 
 	virtual int poll() = 0;
 
-	virtual long int receive(int sockfd, char* buffer, unsigned int buffer_size) = 0;
+	virtual long int receive_data(int sockfd, char* buffer, unsigned int buffer_size) = 0;
 
 	virtual long int send_data(int receiver_fd, const std::string& data) = 0;
 

@@ -14,7 +14,7 @@ public:
 
 	MOCK_METHOD(int, poll, (), (override));
 
-	MOCK_METHOD(long int, receive, (int sockfd, char* buffer, unsigned int buffer_size), (override));
+	MOCK_METHOD(long int, receive_data, (int sockfd, char* buffer, unsigned int buffer_size), (override));
 
 	MOCK_METHOD(long int, send_data, (int receiver_fd, const std::string& data), (override));
 

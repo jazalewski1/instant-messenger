@@ -27,7 +27,7 @@ public:
 
 	int poll() override;
 
-	long int receive(int sockfd, char* buffer, unsigned int boffer_size) override;
+	long int receive_data(int sockfd, char* buffer, unsigned int boffer_size) override;
 
 	long int send_data(int receiver_fd, const std::string& data) override;
 

@@ -35,7 +35,7 @@ int Host::conn(const std::string& ip_address, int port_number)
 	hints.sin_port = htons(port_number);
 	inet_pton(AF_INET, ip_address.c_str(), &hints.sin_addr);
 
-	Utils::display_info("Server", &hints); // TODO: move elsewhere, best to Client
+	Util::display_info("Server", &hints); // TODO: move elsewhere, best to Client
 
 	return connect(m_sockfd, (sockaddr*)&hints, sizeof(hints));
 }

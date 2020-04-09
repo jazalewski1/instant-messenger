@@ -6,9 +6,10 @@
 #include <string.h>
 #include <netdb.h>
 
-namespace Utils
+namespace Util
 {
 
+// Utility functions
 void display_info(const std::string& name, sockaddr_in* sock_addr_ptr) // TODO: could return std::pair of strings with ip and port
 {
 	char ip [NI_MAXHOST];

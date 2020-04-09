@@ -1,9 +1,13 @@
 set(INCLUDES
 includes/Utils.hpp
 includes/Exceptions.hpp
+includes/InputObservable.hpp
+includes/InputObserver.hpp
 )
 
 set(SOURCES
+source/InputObservable.cpp
+source/InputObserver.cpp
 )
 
 add_library(UtilitiesLib SHARED

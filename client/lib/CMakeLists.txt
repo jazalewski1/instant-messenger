@@ -15,7 +15,7 @@ ${SOURCES}
 )
 
 target_link_libraries(ClientLib
-PRIVATE UtilitiesLib
+UtilitiesLib
 )
 
 target_include_directories(ClientLib

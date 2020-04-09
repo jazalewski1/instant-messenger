@@ -59,7 +59,7 @@ std::string Server::receive_from(int source_fd)
 		throw Util::receive_error{};
 
 	if(received_bytes == 0)
-		throw Util::disconnected_exception{};
+		throw Util::disconnected_exception{source_fd};
 	
 	return buffer;
 }

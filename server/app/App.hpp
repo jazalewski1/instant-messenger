@@ -47,8 +47,48 @@ public:
 	{
 		while(m_is_app_running)
 		{
-			int poll_result;
-			try { poll_result = m_server.poll(); }
+			try
+			{
+				auto poll_result = m_server.poll();
+
+				if(poll_result == 0)
+					m_server.add_client();
+				else if(poll_result > 0)
+				{
+					auto received_data = m_server.receive_from(poll_result);
+
+					std::cout << "CLIENT #" << poll_result << "> " << received_data << std::endl;
+
+					if(received_data.find("/sendfile") == 0)
+					{
+						auto filename = std::string{received_data.begin() + received_data.find(' ') + 1, received_data.end()};
+						std::cout << "Request to send file: \"" << filename << "\"" << std::endl;
+
+						m_server.send_to_except(poll_result, "/receivefile " + filename);
+
+						std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+						if(wait_for_accept_file(poll_result))
+						{
+							std::cout << "File accepted." << std::endl;
+
+							m_server.send_to(poll_result, "/acceptfile"); 
+							std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+							transfer_file(poll_result);
+						}
+						else
+						{
+							std::cout << "File not accepted." << std::endl;
+							m_server.send_to(poll_result, "/rejectfile");
+						}
+					}
+					else
+					{
+						m_server.send_to_except(poll_result, received_data);
+					}
+				}			
+			}
 			catch(const Util::poll_error&)
 			{
 				std::cerr << "Error: can't poll!\n";
@@ -59,90 +99,41 @@ public:
 			{
 				continue;
 			}
-
-			if(poll_result == 0)
+			catch(const Util::accept_error&)
 			{
-				try { m_server.add_client(); }
-				catch(const Util::accept_error&)
-				{
-					std::cerr << "Error: can't add client!\n";
-				}
+				std::cerr << "Error: can't add client!\n";
 			}
-			else if(poll_result > 0)
+			catch(const Util::receive_error&)
 			{
-				std::string received_data;
-
-				try { received_data = m_server.receive_from(poll_result); }
-				catch(const Util::receive_error&)
+				std::cerr << "Error: can't receive data!\n";
+				m_is_app_running = false;
+				break;
+			}
+			catch(const Util::disconnected_exception& exc)
+			{
+				try
 				{
-					std::cerr << "Error: can't receive data!\n";
+					m_server.remove_client(exc.sock_fd());
+					continue;
+				}
+				catch(Util::remove_error& remove_exc)
+				{
+					std::cerr << "Error: can't remove client!\n";
 					m_is_app_running = false;
 					break;
 				}
-				catch(const Util::disconnected_exception&)
-				{
-					try { m_server.remove_client(poll_result); }	
-					catch(Util::remove_error& rem_exc)
-					{
-						std::cerr << "Error: can't remove client!\n";
-						m_is_app_running = false;
-						break;
-					}
-					continue;
-				}
-
-				std::cout << "CLIENT #" << poll_result << "> " << received_data << std::endl;
-
-				if(received_data.find("/sendfile") == 0)
-				{
-					std::string filename {received_data.begin() + received_data.find(' ') + 1, received_data.end()};
-					std::cout << "Request to send file: \"" << filename << "\"" << std::endl;
-
-					try { m_server.send_to_except(poll_result, "/receivefile " + filename); }
-					catch(const Util::send_error&)
-					{
-						std::cerr << "Error: can't send data!\n";
-						m_is_app_running = false;
-						break;
-					}
-					std::this_thread::sleep_for(std::chrono::milliseconds(50));
-
-					if(wait_for_accept_file(poll_result))
-					{
-						std::cout << "File accepted." << std::endl;
-						try { m_server.send_to(poll_result, "/acceptfile"); }
-						catch(const Util::send_error&)
-						{
-							std::cerr << "Error: can't send data!\n";
-							m_is_app_running = false;
-							break;
-						}
-						std::this_thread::sleep_for(std::chrono::milliseconds(50));
-
-						transfer_file(poll_result);
-					}
-					else
-					{
-						std::cout << "File not accepted." << std::endl;
-						try { m_server.send_to(poll_result, "/rejectfile"); }
-						catch(const Util::send_error&)
-						{
-							std::cerr << "Error: can't send data!\n";
-							m_is_app_running = false;
-							break;
-						}
-					}
-				}
-				else
-				{
-					try { m_server.send_to_except(poll_result, received_data); }
-					catch(const Util::send_error&)
-					{
-						std::cerr << "Error: can't send data!\n";
-						m_is_app_running = false;
-						break;
-					}
-				}
+			}
+			catch(const Util::send_error&)
+			{
+				std::cerr << "Error: can't send data!\n";
+				m_is_app_running = false;
+				break;
+			}
+			catch(...)
+			{
+				std::cerr << "Error: unknown!\n";
+				m_is_app_running = false;
+				break;
 			}
 		}
 	}
@@ -158,10 +149,9 @@ public:
 			return;
 		}
 
-		m_is_app_running = true;
-
 		std::cout << "Enter \"/close\" to close server.\n";
 
+		m_is_app_running = true;
 		m_input_thread = std::thread{&App::input_loop, this};
 		receive_loop();
 	}
@@ -170,37 +160,35 @@ public:
 	{
 		while(true)
 		{
-			int poll_result;
 			try
 			{
-				poll_result = m_server.poll();
+				auto poll_result = m_server.poll();
+
+				if(poll_result != sender_fd)
+				{
+					auto received_data = m_server.receive_from(poll_result);
+
+					if(received_data.find("/acceptfile") == 0)
+						return true;
+					else
+						break;
+				}
 			}
-			catch(Util::poll_error& poll_exc)
+			catch(const Util::poll_error&)
 			{
 				std::cerr << "Error: polling error!\n";
 				break;
 			}
-
-			if(poll_result != sender_fd)
+			catch(const Util::receive_error&)
 			{
-				std::string received_data;
-				try { received_data = m_server.receive_from(poll_result); }
-				catch(Util::receive_error& rec_exc)
-				{
-					std::cerr << "Error: can't receive data! Socket #" << poll_result << "\n";
-					break;
-				}
-				catch(Util::disconnected_exception& dis_exc)
-				{
-					std::cout << "Client disconnected. Socket #" << poll_result << "\n";
-					m_server.remove_client(poll_result);
-					break;
-				}
-
-				if(received_data.find("/acceptfile") == 0)
-					return true;
-				else
-					break;
+				std::cerr << "Error: can't receive file data!\n";
+				break;
+			}
+			catch(const Util::disconnected_exception& exc)
+			{
+				std::cerr << "Error: client disconnected while accepting file!\n";
+				m_server.remove_client(exc.sock_fd());
+				break;
 			}
 		}
 		return false;
@@ -211,7 +199,15 @@ public:
 		while(true)
 		{
 			std::string received_data;
-			try { received_data = m_server.receive_from(source_fd); }
+			try
+			{
+				received_data = m_server.receive_from(source_fd);
+
+				m_server.send_to_except(source_fd, received_data);
+
+				if(received_data.find("/endfile") == 0)
+					break;
+			}
 			catch(const Util::receive_error&)
 			{
 				std::cerr << "Error: can't receive file!\n";
@@ -219,20 +215,15 @@ public:
 			}
 			catch(const Util::disconnected_exception&)
 			{
-				std::cerr << "Error: client disconnected file receiving file!\n";
+				std::cerr << "Error: client disconnected while transfering file!\n";
 				m_server.remove_client(source_fd);
 				break;
 			}
-
-			try { m_server.send_to_except(source_fd, received_data); }
 			catch(const Util::send_error&)
 			{
 				std::cerr << "Error: can't send file data!\n";
 				break;
 			}
-
-			if(received_data.find("/endfile") == 0)
-				break;
 		}
 	}
 };

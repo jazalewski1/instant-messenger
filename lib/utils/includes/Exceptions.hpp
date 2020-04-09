@@ -5,26 +5,33 @@
 namespace Util
 {
 
-struct exception {};
+class exception {};
 
 // Socket exceptions
-struct poll_error : public exception {};
+class poll_error : public exception {};
 
-struct create_socket_error : public exception {};
+class create_socket_error : public exception {};
 
-struct listen_error : public exception {};
+class listen_error : public exception {};
 
-struct accept_error : public exception {};
+class accept_error : public exception {};
 
-struct remove_error : public exception {};
+class remove_error : public exception {};
 
-struct disconnected_exception : public exception {};
+class disconnected_exception : public exception
+{
+private:
+	int m_sock_fd;
+public:
+	disconnected_exception(int fd) : m_sock_fd{fd} {}
+	int sock_fd() const { return m_sock_fd; }
+};
 
-struct timeout_exception : public exception {};
+class timeout_exception : public exception {};
 
 // Data exceptions
-struct receive_error : public exception {};
+class receive_error : public exception {};
 
-struct send_error : public exception {};
+class send_error : public exception {};
 
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Client.hpp>
+#include <Exceptions.hpp>
 #include <Host.hpp>
 #include <InputObservable.hpp>
 #include <InputObserver.hpp>
@@ -19,14 +20,16 @@ private:
 	InputObserver m_sender;
 	std::thread m_receive_thread;
 	std::thread m_send_thread;
+	std::thread m_input_thread;
 	bool m_is_app_running;
 
+	bool m_block_receive;
 
 public:
 	App() :
 		m_host{}, m_client{&m_host},
 		m_input{}, m_sender{}, m_receiver{},
-		m_is_app_running{false}
+		m_is_app_running{false}, m_block_receive{false}
 	{
 		m_input.add(&m_receiver);
 		m_input.add(&m_sender);
@@ -38,28 +41,36 @@ public:
 			m_receive_thread.join();
 		if(m_send_thread.joinable())
 			m_send_thread.join();
+		if(m_input_thread.joinable())
+			m_input_thread.join();
 		
 		std::cout << "Client closing.\n";
 	}
 
 
-	int start(std::string ip_address, int port_number)
+	void start(std::string ip_address, int port_number)
 	{
-		auto connect_result = m_client.connect(ip_address, port_number);
-		if(connect_result <= -1)
+		try { m_client.connect(ip_address, port_number); }
+		catch(const Util::create_socket_error&)
+		{
+			std::cerr << "Error: can't create socket!\n";
+			return;
+		}
+		catch(const Util::connect_error&)
 		{
 			std::cerr << "Error: can't connect to server!\n";
-			return -1;
+			return;
 		}
+
 		std::cout << "Succesfully connected to server!\n\n";
-		std::cout << "(type \"/close\" to disconnect)\n";
-		std::cout << "(type \"/sendfile <absolutePathToFile>\" to send a file)\n\n";
+		std::cout << "Enter \"/close\" to disconnect\n";
+		std::cout << "Enter \"/sendfile <absolute_path_to_file>\" to send a file\n\n";
 
 		m_is_app_running = true;
 
+		m_input_thread = std::thread{&App::input_loop, this};
 		m_receive_thread = std::thread{&App::receive_loop, this};
 		m_send_thread = std::thread{&App::send_loop, this};
-		input_loop();
 	}
 
 	void input_loop()
@@ -68,7 +79,6 @@ public:
 		while(m_is_app_running)
 		{
 			std::getline(std::cin, input);
-			std::cout << "YOU> " << input << "\n";
 
 			if(input.find("/close") == 0)
 			{
@@ -76,16 +86,18 @@ public:
 				break;
 			}
 			else
-			{
 				m_input.notify(input);
-			}
 		}
 	}
 
-	std::string request_input(InputObserver& observer) // TODO: this has to throw when app is shut down (or come up with different design)
+	std::string get_input(InputObserver& observer)
 	{
 		observer.set_wants_input(true);
-		while(!observer.has_input() && m_is_app_running);
+		while(!observer.has_input())
+		{
+			if(!m_is_app_running)
+				throw Util::close_exception{};
+		}
 		observer.set_wants_input(false);
 		return observer.get_input();
 	}
@@ -94,202 +106,234 @@ public:
 	{
 		while(m_is_app_running)
 		{
-			constexpr auto buffer_size = 4096U;
-			char buffer [buffer_size];
-
-			auto received_bytes = m_client.receive_data_nonblocking(buffer, buffer_size);
-			if(received_bytes == -1)
+			try
 			{
-				std::cerr << "Error: can't receive data!" << std::endl;
-				m_is_app_running = false;
-				break;
-			}
-			else if(received_bytes == 0)
-			{
-				std::cerr << "Server shut down." << std::endl;
-				m_is_app_running = false;
-				break;
-			}
-			else if(received_bytes > 0)
-			{
-				std::string received_data {buffer};
-
-				if(received_data.find("/receivefile") == 0)
+				if(!m_block_receive)
 				{
-					std::string filename {received_data.begin() + received_data.find_first_not_of("/receivefile "), received_data.end()};
+					auto received_data = m_client.receive_data_nonblocking();
 
-					std::ofstream outfile;
-
-					auto accept_file_result = accept_file(filename, outfile);
-					if(accept_file_result <= -1)
+					if(received_data.find("/receivefile") == 0)
 					{
-						std::cout << "File not accepted." << std::endl;
-						m_client.send_data("/rejectfile");
-					}
-					else
-					{
-						m_client.send_data("/acceptfile");
-						std::cout << "Starting to receive data." << std::endl;
+						std::string filename {received_data.begin() + received_data.find_first_not_of("/receivefile "), received_data.end()};
 
-						auto file_received_bytes = m_client.receive_file(outfile);
-						if(file_received_bytes <= -1)
+						if(accept_file(filename))
 						{
-							std::cerr << "Error: can't receive file!" << std::endl;
+							std::cout << "Enter absolute path to save file:\n";
+							auto filepath = get_input(m_receiver);
+							filepath.append(filename);
+
+							std::ofstream outfile;
+							outfile.open(filepath);
+							if(outfile.is_open())
+							{
+								m_client.send_data("/acceptfile");
+								receive_file(outfile);
+							}
+							else
+							{
+								std::cerr << "Error: can't create file!\n";
+								std::cout << "File not accepted.";
+							}
+							outfile.close();
 						}
 						else
 						{
-							std::cout << "Total received bytes: " << file_received_bytes << std::endl;
+							std::cout << "File not accepted.";
 						}
 					}
-					outfile.close();
-				}
-				else
-				{
-					std::cout << "CHAT> " << received_data << std::endl;
+					else
+					{
+						std::cout << "CHAT> " << received_data << "\n";
+					}
 				}
 			}
-
+			catch(const Util::timeout_exception&)
+			{
+				continue;
+			}
+			catch(const Util::receive_error&)
+			{
+				std::cerr << "Error: can't receive data!\n";
+				continue;
+			}
+			catch(const Util::disconnected_exception&)
+			{
+				std::cerr << "Server shut down.\n";
+				m_is_app_running = false;
+				break;
+			}
 		}
 	}
 
-	// RETURNS: 0 on accepted; -1 on rejected
-	int accept_file(const std::string& filename, std::ofstream& outfile)
+	bool accept_file(const std::string& filename)
 	{
-		std::cout << "Incoming file. Filename: \"" << filename << "\"" << std::endl;
-		std::cout << "Do you accept? [Y / N]" << std::endl;
+		std::cout << "Incoming file. Filename: \"" << filename << "\"\n";
+		std::cout << "Do you accept? [Y / N]\n";
 
-		auto input = request_input(m_receiver);
-
-		if(input.find("Y") != 0)
-			return -1;
-
-		std::cout << "Enter absolute path to save file: " << std::endl;
-		auto filepath = request_input(m_receiver);
-		filepath.append(filename);
-
-		outfile.open(filepath);
-
-		if(!outfile.is_open())
+		try
 		{
-			std::cerr << "Error: can't open file! Path:" << std::endl;
-			std::cout << filepath << std::endl;
-			return -1;
+			auto input = get_input(m_receiver);
+
+			if(input.find("Y") == 0)
+				return true;
 		}
-		return 0;
+		catch(const Util::close_exception&) { /* Don't do anything */ }
+		return false;
+	}
+
+	void receive_file(std::ofstream& outfile)
+	{
+		std::cout << "Starting to receive file.\n";
+		while(true)
+		{
+			try
+			{
+				std::string received_data;
+
+				m_block_receive = true;
+				received_data = m_client.receive_data_blocking();
+				m_block_receive = false;
+
+				if(received_data.find("/endfile") == 0)
+					break;
+
+				outfile << received_data;
+			}
+			catch(const Util::receive_error&)
+			{
+				std::cerr << "Error: failed to receive file data!\n";
+				m_block_receive = false;
+				return;
+			}
+			catch(const Util::disconnected_exception&)
+			{
+				std::cerr << "Error: server disconnected while receiving file!\n";
+				m_block_receive = false;
+				return;
+			}
+		}
+		std::cout << "File received successfully.\n";
 	}
 
 	void send_loop()
 	{
 		while(m_is_app_running)
 		{
-			auto input = request_input(m_sender);
+			std::string input;
+			try { input = get_input(m_sender); }
+			catch(const Util::close_exception&) { break; }
 
 			if(input.find("/sendfile") == 0)
 			{
 				auto whitespace_index = input.find_first_not_of("/sendfile");
 				if(whitespace_index == std::string::npos || whitespace_index == input.length() - 1)
 				{
-					std::cerr << "Usage: \"/sendfile <absolutePathToFile>\"" << std::endl;
+					std::cerr << "Usage: \"/sendfile <absolute_path_to_file>\"\n";
 					continue;
 				}
 				else
 				{
 					std::string filepath {input.begin() + whitespace_index + 1, input.end()};
 
-					std::ifstream in_file;
-					auto request_result = request_send_file(filepath, in_file);
-					if(request_result <= -1)
-					{
-						std::cerr << "Error: request failed!" << std::endl;
-						continue;
-					}
-
-					auto send_file_result = m_client.send_file(in_file);
-					if(send_file_result <= -1)
-					{
-						std::cerr << "Error: failed to send file!" << std::endl;
-						continue;
-					}
-					in_file.close();
-
-					std::this_thread::sleep_for(std::chrono::milliseconds(50));
-					m_client.send_data("/endfile");
-
-					std::cout << "File sent succesfully." << std::endl;
+					send_file(filepath);
 				}
 			}
 			else if(input.find("/") == 0)
 			{
-				std::cerr << "Unknown command: " << input << std::endl;
+				std::cerr << "Unknown command: " << input << "\n";
 			}
 			else
 			{
-				auto sent_bytes = m_client.send_data(input);
-				if(sent_bytes == -1)
-				{
-					std::cerr << "Error: can't send data!" << std::endl;
-					m_is_app_running = false;
-					break;
-				}
-				else if(sent_bytes == 0)
-				{
-					std::cout << "Disconnecting..." << std::endl;
-					m_is_app_running = false;
-					break;
-				}
+				send_message(input);
 			}
 		}
 	}
 
-	int request_send_file(const std::string& filepath, std::ifstream& in_file)
+	void send_message(const std::string& message)
 	{
-		in_file.open(filepath);
-
-		std::string filename {filepath.begin() + filepath.find_last_of('/') + 1, filepath.end()};
-
-		if(!in_file.is_open())
+		try { m_client.send_data(message); }
+		catch(const Util::send_error&)
 		{
-			std::cerr << "Error: can't open file: \"" << filename << "\"!" << std::endl;
-			return -1;
+			std::cerr << "Error: can't send data!\n";
+			m_is_app_running = false;
 		}
-
-		m_client.send_data("/sendfile " + filename);
-		if(wait_for_accept_file() <= -1)
+		catch(const Util::disconnected_exception&)
 		{
-			std::cerr << "Error: file not accepted." << std::endl;
-			return -1;
+			std::cout << "Disconnecting...\n";
+			m_is_app_running = false;
 		}
-		return 0;
+	}
+	
+	void send_file(const std::string& filepath)
+	{
+		std::ifstream infile;
+		infile.open(filepath);
+		if(infile.is_open())
+		{
+			try
+			{
+				auto filename = std::string{filepath.begin() + filepath.find_last_of('/') + 1, filepath.end()};
+				m_client.send_data("/sendfile " + filename);
+
+				std::cout << "Waiting for accepting the file...\n";
+				if(wait_for_accept_file())
+				{
+					std::cerr << "File accepted.\n";
+					std::cout << "Starting to send file.\n";
+
+					std::vector<char> buffer (4096U, 0);
+
+					infile.read(buffer.data(), buffer.size());
+					while(infile.gcount() > 0)
+					{
+						m_client.send_data(buffer.data());
+
+						infile.read(buffer.data(), buffer.size());
+					}
+
+					std::this_thread::sleep_for(std::chrono::milliseconds(50));
+					m_client.send_data("/endfile");
+					infile.close();
+					
+					std::cout << "File sent successfully.\n";
+				}
+				else
+				{
+					std::cout << "File not accepted.\n";
+				}
+			}
+			catch(const Util::send_error&)
+			{
+				std::cerr << "Error: can't send file data!\n";
+			}
+		}
+		else
+		{
+			std::cerr << "Error: can't open file!\n";
+		}
 	}
 
-	// RETURNS: 0 on accepted; -1 on rejected
-	int wait_for_accept_file()
+	bool wait_for_accept_file()
 	{
-		auto buffer_size = 4096U;
-		char buffer [buffer_size];
+		try 
+		{
+			std::string received_data;
 
-		std::cout << "Waiting for accepting the file..." << std::endl;
-		auto received_bytes = m_client.receive_data_blocking(buffer, buffer_size);
-		if(received_bytes <= -1)
-		{
-			std::cerr << "Error: can't receive data!" << std::endl;
-			m_is_app_running = false;
-			return -1;
+			m_block_receive = true;
+			received_data = m_client.receive_data_blocking();
+
+			if(received_data.find("/acceptfile") == 0)
+				return true;
 		}
-		else if(received_bytes == 0)
+		catch(const Util::receive_error&)
 		{
-			std::cerr << "Server shut down." << std::endl;
-			m_is_app_running = false;
-			return -1;
+			std::cerr << "Error: can't receive accept data!\n";
 		}
-		else if(received_bytes > 0)
+		catch(const Util::disconnected_exception&)
 		{
-			std::string data {buffer};
-			if(data.find("/acceptfile") == 0)
-				return 0;
-			else if(data.find("/rejectfile") == 0)
-				return -1;
+			std::cerr << "Error: server disconnected while accepting file!\n";
 		}
-		return -1;
+		m_block_receive = false;
+		return false;
 	}
 };

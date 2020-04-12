@@ -12,6 +12,8 @@ class poll_error : public exception {};
 
 class create_socket_error : public exception {};
 
+class connect_error : public exception {};
+
 class listen_error : public exception {};
 
 class accept_error : public exception {};
@@ -33,5 +35,8 @@ class timeout_exception : public exception {};
 class receive_error : public exception {};
 
 class send_error : public exception {};
+
+// App exceptions
+class close_exception : public exception {};
 
 }

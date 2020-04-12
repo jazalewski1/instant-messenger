@@ -18,15 +18,15 @@ public:
 
 	~Client();
 
-	int connect(const std::string& ip_address, int port_number);
+	void connect(const std::string& ip_address, int port_number);
 
-	long int send_data(const std::string& data);
+	void send_data(const std::string& data);
 
-	long int receive_data_nonblocking(char* buffer, long int buffer_size);
+	std::string receive_data_nonblocking();
 
-	long int receive_data_blocking(char* buffer, long int buffer_size);
+	std::string receive_data_blocking();
 
-	long int receive_file(std::ostream& out_file);
+	void receive_file(std::ostream& out_file);
 
-	int send_file(std::ifstream& in_file);
+	void send_file(std::ifstream& in_file);
 };

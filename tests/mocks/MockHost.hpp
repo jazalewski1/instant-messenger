@@ -9,9 +9,11 @@ public:
 	
 	MOCK_METHOD(int, conn, (const std::string& ip_address, int port_number), (override));
 
-	MOCK_METHOD(long int, receive_nonblocking, (char* buffer, int buffer_size), (override));
+	MOCK_METHOD(long int, receive_nonblocking, (char* buffer, unsigned long int buffer_size), (override));
 
-	MOCK_METHOD(long int, receive_blocking, (char* buffer, int buffer_size), (override));
+	MOCK_METHOD(long int, receive_blocking, (char* buffer, unsigned long int buffer_size), (override));
 
 	MOCK_METHOD(long int, send_data, (const std::string& data), (override));
+
+	MOCK_METHOD(int, get_sock_fd, (), (override, const));
 };

@@ -1,6 +1,7 @@
 #include <Exceptions.hpp>
 #include <Listener.hpp>
 #include <Server.hpp>
+#include <iostream>
 #include <string>
 #include <thread>
 

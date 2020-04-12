@@ -106,45 +106,44 @@ public:
 	{
 		while(m_is_app_running)
 		{
+			if(m_block_receive)
+				continue;
 			try
 			{
-				if(!m_block_receive)
+				auto received_data = m_client.receive_data_nonblocking();
+
+				if(received_data.find("/receivefile") == 0)
 				{
-					auto received_data = m_client.receive_data_nonblocking();
+					std::string filename {received_data.begin() + received_data.find_first_not_of("/receivefile "), received_data.end()};
 
-					if(received_data.find("/receivefile") == 0)
+					if(accept_file(filename))
 					{
-						std::string filename {received_data.begin() + received_data.find_first_not_of("/receivefile "), received_data.end()};
+						std::cout << "Enter absolute path to save file:\n";
+						auto filepath = get_input(m_receiver);
+						filepath.append(filename);
 
-						if(accept_file(filename))
+						std::ofstream outfile;
+						outfile.open(filepath);
+						if(outfile.is_open())
 						{
-							std::cout << "Enter absolute path to save file:\n";
-							auto filepath = get_input(m_receiver);
-							filepath.append(filename);
-
-							std::ofstream outfile;
-							outfile.open(filepath);
-							if(outfile.is_open())
-							{
-								m_client.send_data("/acceptfile");
-								receive_file(outfile);
-							}
-							else
-							{
-								std::cerr << "Error: can't create file!\n";
-								std::cout << "File not accepted.";
-							}
-							outfile.close();
+							m_client.send_data("/acceptfile");
+							receive_file(outfile);
 						}
 						else
 						{
+							std::cerr << "Error: can't create file!\n";
 							std::cout << "File not accepted.";
 						}
+						outfile.close();
 					}
 					else
 					{
-						std::cout << "CHAT> " << received_data << "\n";
+						std::cout << "File not accepted.";
 					}
+				}
+				else
+				{
+					std::cout << "CHAT> " << received_data << "\n";
 				}
 			}
 			catch(const Util::timeout_exception&)
@@ -188,11 +187,8 @@ public:
 		{
 			try
 			{
-				std::string received_data;
-
 				m_block_receive = true;
-				received_data = m_client.receive_data_blocking();
-				m_block_receive = false;
+				auto received_data = m_client.receive_data_blocking();
 
 				if(received_data.find("/endfile") == 0)
 					break;
@@ -202,17 +198,13 @@ public:
 			catch(const Util::receive_error&)
 			{
 				std::cerr << "Error: failed to receive file data!\n";
-				m_block_receive = false;
-				return;
 			}
 			catch(const Util::disconnected_exception&)
 			{
 				std::cerr << "Error: server disconnected while receiving file!\n";
-				m_block_receive = false;
-				return;
 			}
 		}
-		std::cout << "File received successfully.\n";
+		m_block_receive = false;
 	}
 
 	void send_loop()
@@ -259,7 +251,7 @@ public:
 		}
 		catch(const Util::disconnected_exception&)
 		{
-			std::cout << "Disconnecting...\n";
+			std::cout << "Error: server shut down!\n";
 			m_is_app_running = false;
 		}
 	}
@@ -305,6 +297,11 @@ public:
 			catch(const Util::send_error&)
 			{
 				std::cerr << "Error: can't send file data!\n";
+			}
+			catch(const Util::disconnected_exception&)
+			{
+				std::cout << "Error: server shut down!\n";
+				m_is_app_running = false;
 			}
 		}
 		else

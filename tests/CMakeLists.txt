@@ -2,6 +2,7 @@ add_executable(ClientTest source/ClientTest.cpp)
 
 target_link_libraries(ClientTest
 PRIVATE ClientLib
+PRIVATE UtilitiesLib
 PRIVATE gtest
 PRIVATE gtest_main
 PRIVATE gmock

@@ -1,9 +1,7 @@
 #pragma once
 
 #include <Listener.hpp>
-#include <iostream>
 #include <string>
-#include <thread>
 
 class Server
 {

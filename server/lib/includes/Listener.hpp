@@ -1,7 +1,6 @@
 #pragma once
 
 #include <IListener.hpp>
-#include <iostream>
 #include <netdb.h>
 #include <string>
 

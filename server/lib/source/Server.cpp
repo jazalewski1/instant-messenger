@@ -3,7 +3,6 @@
 #include <Exceptions.hpp>
 #include <iostream>
 #include <string>
-#include <string.h>
 
 Server::Server(IListener* listener) :
 	m_listener{listener}

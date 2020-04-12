@@ -1,7 +1,6 @@
 #pragma once
 
 #include <IHost.hpp>
-#include <arpa/inet.h>
 #include <string>
 
 class Host : public IHost

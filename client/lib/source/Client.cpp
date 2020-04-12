@@ -2,9 +2,7 @@
 #include <Exceptions.hpp>
 #include <Host.hpp>
 #include <iostream>
-#include <fstream>
 #include <string>
-#include <vector>
 
 Client::Client(IHost* host) :
 	m_host{host}

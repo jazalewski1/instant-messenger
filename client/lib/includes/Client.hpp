@@ -1,9 +1,7 @@
 #pragma once
 
 #include <Host.hpp>
-#include <fstream>
 #include <string>
-#include <thread>
 
 class Client
 {

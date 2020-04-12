@@ -68,7 +68,9 @@ int Listener::create_listening_socket(const std::string& port_number)
 
 	std::cout << "Listening socket #" << m_listening_fd << std::endl;
 
-	Util::display_info("Server", (sockaddr_in*)list_result->ai_addr);
+	auto info = Util::display_info((sockaddr_in*)list_result->ai_addr);
+	std::cout << "Server's IP: " << info.first << ", port: " << info.second << "\n";
+
 	return 0;
 }
 
@@ -98,7 +100,8 @@ int Listener::accept_host()
 		return -1;
 
 	FD_SET(new_fd, &m_master);
-	Util::display_info("Client", (sockaddr_in*)&remote_addr);
+	auto info = Util::display_info((sockaddr_in*)&remote_addr);
+	std::cout << "New client's IP: " << info.first << ", port: " << info.second << "\n";
 
 	if(new_fd > m_sockfd_count)
 		m_sockfd_count = new_fd;
